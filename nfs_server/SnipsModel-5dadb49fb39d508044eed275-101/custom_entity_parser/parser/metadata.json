@@ -1,0 +1,20 @@
+{
+  "parsers_metadata": [
+    {
+      "entity_identifier": "5b3f7d4c25c4a9ef5ab348c4",
+      "entity_parser": "parser_1"
+    },
+    {
+      "entity_identifier": "5b46149ad595bf55320aea92",
+      "entity_parser": "parser_2"
+    },
+    {
+      "entity_identifier": "5b98fcadad88836627c0fde4",
+      "entity_parser": "parser_3"
+    },
+    {
+      "entity_identifier": "5bbcc094f604b80921bab387",
+      "entity_parser": "parser_4"
+    }
+  ]
+}

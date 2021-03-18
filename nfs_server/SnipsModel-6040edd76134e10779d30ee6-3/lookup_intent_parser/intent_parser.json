@@ -1,0 +1,71 @@
+{
+  "config": {
+    "ignore_stop_words": true,
+    "unit_name": "lookup_intent_parser"
+  },
+  "entity_scopes": [
+    {
+      "entity_scope": {
+        "builtin": [],
+        "custom": []
+      },
+      "intent_group": [
+        "intentslug1"
+      ]
+    },
+    {
+      "entity_scope": {
+        "builtin": [],
+        "custom": [
+          "entity"
+        ]
+      },
+      "intent_group": [
+        "intentslug2"
+      ]
+    },
+    {
+      "entity_scope": {
+        "builtin": [],
+        "custom": [
+          "entity2",
+          "entity"
+        ]
+      },
+      "intent_group": [
+        "intentslug3"
+      ]
+    }
+  ],
+  "intents_names": [
+    "intentslug1",
+    "intentslug2",
+    "intentslug3"
+  ],
+  "language_code": "fr",
+  "map": {
+    "-933345235": [
+      0,
+      []
+    ],
+    "-126753079": [
+      2,
+      [
+        1
+      ]
+    ],
+    "-35400756": [
+      2,
+      []
+    ],
+    "410157961": [
+      0,
+      []
+    ]
+  },
+  "slots_names": [
+    "entity",
+    "entity2"
+  ],
+  "stop_words_whitelist": {}
+}

@@ -1,0 +1,17 @@
+current_component_name: ''
+current_component_number: 0
+language: fr
+model: '99'
+model_size: 2.612060 MB
+number_of_components: 0
+oldModel: '97'
+persist_time: '0:00:00.086939'
+project: 5dadb49fb39d508044eed275
+training: false
+training_data:
+  len_entities: 0
+  len_intents: 55
+  len_utterances: 2168
+training_seed: 42
+training_time: '0:00:01.285318'
+type: TrainStatusResultMessage
