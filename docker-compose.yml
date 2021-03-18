@@ -16,13 +16,13 @@ services:
     environment:
       - SNIPS_HOST=0.0.0.0
       - SNIPS_PORT=5000
-      - SSE_REDIS_URL = "redis://localhost:6379/0"
+      - SSE_REDIS_URL=redis://redis:6379/0
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "middleware:snips_app"]
 
   redis:
     image: "redis:alpine"
     ports:
-      - 6379:6379
+      - 6379
     networks:
       - snipsntework
 

@@ -65,8 +65,19 @@ def training_callback(future):
 class SmartlySnipsTrainResource(Resource):
     def get(self):
         params = request.args
-        executor_id = params['project']+"-"+params['model']
+        project_id = params.get('project')
+        model_version = params.get('model')
+        executor_id = project_id+"-"+model_version
         task_ok = executor.futures.done(executor_id)
+        print(task_ok)
+        if task_ok == None:
+            return  {'type': 'TrainStatusResultMessage',
+                    'project': params['project'],
+                    'training': False,
+                    'current_component_name': '',
+                    'current_component_number': 0,
+                    'number_of_components': 0 }, 400
+
         if not task_ok:
             state = executor.futures._state(executor_id)
             return {'status': state,
