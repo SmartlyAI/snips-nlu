@@ -1,22 +1,39 @@
 version: "3.3"
 services:
-  snipsfr:
+  snips_parse:
     build: 
-      context: .
+      context: ./snips-nlu-parse
     depends_on:
       - redis
     ports:
       - 5500:5000
     volumes:
-      - /snips-data:/snips_smartly/nfs_server
+      - /snips-data:/snips_parse/nfs_server
     networks:
       - snipsntework
     environment:
       - SNIPS_HOST=0.0.0.0
       - SNIPS_PORT=5000
       - SSE_REDIS_URL=redis://redis:6379/0
-    command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "middleware:snips_app"]
-
+      - NSF_SERVER_PATH=/snips_parse/nfs_server
+    command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_parse:smartly_parse_app"]
+  snips_train:
+    build: 
+      context: ./snips-nlu-train
+    depends_on:
+      - redis
+    ports:
+      - 5400:5000
+    volumes:
+      - /snips-data:/snips_train/nfs_server
+    networks:
+      - snipsntework
+    environment:
+      - SNIPS_HOST=0.0.0.0
+      - SNIPS_PORT=5000
+      - SSE_REDIS_URL=redis://redis:6379/0
+      - NSF_SERVER_PATH=/snips_train/nfs_server
+    command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_train:smartly_train_app"]
   redis:
     image: "redis:alpine"
     ports:
