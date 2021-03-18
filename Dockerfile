@@ -11,7 +11,9 @@ RUN apt-get -y install locales && \
     apt-get install -y --upgrade gcc musl musl-dev g++
 RUN sed -i '/en_FR.UTF-8/s/^# //g' /etc/locale.gen && \
     locale-gen
-COPY . .
+
+COPY requirements.txt requirements.txt
+
 RUN pip3 install pipenv setuptools_rust
 RUN pip3 install -r requirements.txt
 RUN python3 -m snips_nlu download-all-languages && \
@@ -20,5 +22,10 @@ RUN python3 -m snips_nlu download-all-languages && \
     python3 -m snips_nlu download-language-entities de && \
     python3 -m snips_nlu download-language-entities es && \
     python3 -m snips_nlu download-language-entities it
+
+RUN mkdir snips_smartly
+WORKDIR /snips_smartly
+COPY . .
+
 EXPOSE 5000
 CMD ["gunicorn", "-b 0.0.0.0:5000", "middleware:snips_app"]
