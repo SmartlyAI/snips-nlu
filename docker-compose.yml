@@ -34,12 +34,6 @@ services:
       - SSE_REDIS_URL=redis://redis:6379/0
       - NSF_SERVER_PATH=/snips_train/nfs_server
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_train:smartly_train_app"]
-  redis:
-    image: "redis:alpine"
-    ports:
-      - 6379
-    networks:
-      - snipsntework
 
 networks:
   snipsntework:
