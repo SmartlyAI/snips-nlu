@@ -3,8 +3,6 @@ services:
   snips_parse:
     build: 
       context: ./snips-nlu-parse
-    depends_on:
-      - redis
     ports:
       - 5500:5000
     volumes:
@@ -20,8 +18,6 @@ services:
   snips_train:
     build: 
       context: ./snips-nlu-train
-    depends_on:
-      - redis
     ports:
       - 5400:5000
     volumes:
