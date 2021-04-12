@@ -36,7 +36,7 @@ services:
     ports:
       - 3000:3000
     volumes:
-      - /snips-data:/snips-data
+      - /snips-data:/home/hestia/app/snips-data
     environment:
       - RABBITMQ_URL
       - NODE_ENV
