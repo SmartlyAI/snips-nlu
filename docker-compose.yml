@@ -1,5 +1,54 @@
-version: "3.3"
+version: "3.8"
+
+networks:
+  snips_nlu_network:
+    external: false
+    attachable: true
+
+volumes:
+  rabbitmq:
+    external: true
+
 services:
+  rabbitmq:
+    image: rabbitmq:3.8.14-management-alpine
+    volumes:
+      - rabbitmq:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USER}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASS}
+      - NODENAME=${RABBITMQ_HOSTNAME}@localhost
+    networks:
+      - snips_nlu_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role==manager]
+      restart_policy:
+        condition: any
+  hestia:
+    build: 
+      context: ./hestia
+    ports:
+      - 3000:3000
+    volumes:
+      - /snips-data:/snips-data
+    environment:
+      - RABBITMQ_URL
+      - NODE_ENV
+    networks:
+      - snips_nlu_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role==manager]
+      restart_policy:
+        condition: any
   snips_parse:
     build: 
       context: ./snips-nlu-parse
@@ -7,13 +56,20 @@ services:
       - 5500:5000
     volumes:
       - /snips-data:/snips_parse/nfs_server
-    networks:
-      - snipsntework
     environment:
       - SNIPS_HOST=0.0.0.0
       - SNIPS_PORT=5000
-      - SSE_REDIS_URL=redis://redis:6379/0
+      - QUEUE_URL
       - NSF_SERVER_PATH=/snips_parse/nfs_server
+    networks:
+      - snips_nlu_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role==manager]
+      restart_policy:
+        condition: any
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_parse:smartly_parse_app"]
   snips_train:
     build: 
@@ -22,15 +78,18 @@ services:
       - 5400:5000
     volumes:
       - /snips-data:/snips_train/nfs_server
-    networks:
-      - snipsntework
     environment:
       - SNIPS_HOST=0.0.0.0
       - SNIPS_PORT=5000
-      - SSE_REDIS_URL=redis://redis:6379/0
+      - QUEUE_URL
       - NSF_SERVER_PATH=/snips_train/nfs_server
+    networks:
+      - snips_nlu_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role==manager]
+      restart_policy:
+        condition: any
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_train:smartly_train_app"]
-
-networks:
-  snipsntework:
-    driver: bridge
