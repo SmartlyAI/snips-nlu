@@ -11,7 +11,7 @@ volumes:
 
 services:
   rabbitmq:
-    image: rabbitmq:management-alpine
+    image: rabbitmq:3.8.14-management-alpine
     volumes:
       - rabbitmq:/var/lib/rabbitmq
     ports:
