@@ -13,7 +13,7 @@ if [ ! -d "hestia" ]; then
   cd hestia && git checkout snips && cd ..
 else
   echo 'Updating hestia repository'
-  cd hestia &&  git fetch && git checkout $1 && git pull origin snips && cd ..
+  cd hestia &&  git fetch && git checkout snips && git pull origin snips && cd ..
 fi
 
 # Cloning snips-nlu-parse only if it does not exist
