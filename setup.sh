@@ -10,10 +10,10 @@ docker volume create --name=rabbitmq
 # Cloning hestia only if it does not exist
 if [ ! -d "hestia" ]; then
   git clone https://github.com/SmartlyAI/hestia.git
-  cd hestia && git checkout $1 && cd ..
+  cd hestia && git checkout snips && cd ..
 else
   echo 'Updating hestia repository'
-  cd hestia &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
+  cd hestia &&  git fetch && git checkout $1 && git pull origin snips && cd ..
 fi
 
 # Cloning snips-nlu-parse only if it does not exist
