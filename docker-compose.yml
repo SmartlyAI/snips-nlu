@@ -31,6 +31,7 @@ services:
       restart_policy:
         condition: any
   hestia:
+    image: 127.0.0.1:5000/hestia
     build: 
       context: ./hestia
     ports:
@@ -51,6 +52,7 @@ services:
       restart_policy:
         condition: any
   snips_parse:
+    image: 127.0.0.1:5000/snips_parse
     build: 
       context: ./snips-nlu-parse
       args:
@@ -76,6 +78,7 @@ services:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_parse:smartly_parse_app"]
   snips_train:
+    image: 127.0.0.1:5000/snips_train
     build: 
       context: ./snips-nlu-train
       args:
