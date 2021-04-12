@@ -34,5 +34,10 @@ else
   cd snips-nlu-train &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
 fi
 
-# Build, push on registry and create snips_nlu stack
-docker-compose build && docker-compose push && env $(cat .env | grep ^[A-Z] | xargs) docker stack deploy --compose-file docker-compose.yml snipsnlu
+# Build stack
+privatekey=$(cat ~/.ssh/id_rsa)
+publickey=$(cat ~/.ssh/id_rsa.pub)
+SSH_PRIVATE_KEY="$privatekey" SSH_PUBLIC_KEY="$publickey" docker-compose build
+
+# Push and launch snips_nlu stack
+docker-compose push && env $(cat .env | grep ^[A-Z] | xargs) docker stack deploy --compose-file docker-compose.yml snipsnlu
