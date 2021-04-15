@@ -10,6 +10,21 @@ volumes:
     external: true
 
 services:
+  nginx:
+    image: 127.0.0.1:5000/nginx
+    build: 
+      context: ./nginx
+    ports:
+      - "80:80"
+    networks:
+      - snips_nlu_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role==manager]
+      restart_policy:
+        condition: any
   rabbitmq:
     image: rabbitmq:3.8.14-management-alpine
     volumes:
@@ -51,7 +66,7 @@ services:
         constraints: [node.role==manager]
       restart_policy:
         condition: any
-  snips_parse:
+  parse:
     image: 127.0.0.1:5000/snips_parse
     build: 
       context: ./snips-nlu-parse
@@ -77,7 +92,7 @@ services:
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_parse:smartly_parse_app"]
-  snips_train:
+  train:
     image: 127.0.0.1:5000/snips_train
     build: 
       context: ./snips-nlu-train
@@ -92,6 +107,7 @@ services:
       - SNIPS_HOST=0.0.0.0
       - SNIPS_PORT=5000
       - RABBITMQ_URL
+      - SSE_REDIS_URL=redis://redis:6379/0
       - NSF_SERVER_PATH=/snips_train/nfs_server
     networks:
       - snips_nlu_network
