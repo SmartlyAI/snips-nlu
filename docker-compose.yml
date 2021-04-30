@@ -43,6 +43,7 @@ services:
     environment:
       - RABBITMQ_URL
       - NODE_ENV
+      - API_SMARTLY_ENDPOINT
     networks:
       - snips_nlu_network
     command: ["./wait-for-it.sh", "rabbitmq", "node", "index"]
