@@ -1,3 +1,9 @@
+# Install NFS protcol for snips-data
+sudo apt-get install nfs-kernel-server -y
+sudo chown -R $USER:$USER /snips-data
+echo "/snips-data    ${DISTANT_SERVER_PRIVATE_IP}(rw,sync,no_subtree_check)" | sudo tee /etc/exports
+sudo systemctl restart nfs-kernel-server
+
 # Swarm alreay cerated with docker swarm init on azure
 docker swarm init
 
