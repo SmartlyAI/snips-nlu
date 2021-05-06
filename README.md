@@ -11,3 +11,4 @@
 
 ## To install Nginx/Amplify:
 - launch the _nginx.setup.sh_ script with the following command `env $(cat .env | grep ^[A-Z] | xargs) sh nginx.setup.sh`.
+
