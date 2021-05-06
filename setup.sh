@@ -1,3 +1,9 @@
+# Install NFS protcol for snips-data
+sudo apt-get install nfs-kernel-server -y
+sudo chown -R $USER:$USER /snips-data
+echo "/snips-data    ${DISTANT_SERVER_PRIVATE_IP}(rw,sync,no_subtree_check)" | sudo tee /etc/exports
+sudo systemctl restart nfs-kernel-server
+
 # Swarm alreay cerated with docker swarm init on azure
 docker swarm init
 
@@ -9,16 +15,16 @@ docker volume create --name=rabbitmq
 
 # Cloning hestia only if it does not exist
 if [ ! -d "hestia" ]; then
-  git clone https://github.com/SmartlyAI/hestia.git
-  cd hestia && git checkout $1 && cd ..
+  git clone git@github.com:SmartlyAI/hestia.git
+  cd hestia && git checkout snips && cd ..
 else
   echo 'Updating hestia repository'
-  cd hestia &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
+  cd hestia &&  git fetch && git checkout snips && git pull origin snips && cd ..
 fi
 
 # Cloning snips-nlu-parse only if it does not exist
 if [ ! -d "snips-nlu-parse" ]; then
-  git clone https://github.com/SmartlyAI/snips-nlu-parse.git
+  git clone git@github.com:SmartlyAI/snips-nlu-parse.git
   cd snips-nlu-parse && git checkout $1 && cd ..
 else
   echo 'Updating snips-nlu-parse repository'
@@ -27,12 +33,17 @@ fi
 
 # Cloning snips-nlu-train only if it does not exist
 if [ ! -d "snips-nlu-train" ]; then
- git clone https://github.com/SmartlyAI/snips-nlu-train.git
+ git clone git@github.com:SmartlyAI/snips-nlu-train.git
  cd snips-nlu-train && git checkout $1 && cd ..
 else
   echo 'Updating snips-nlu-train repository'
   cd snips-nlu-train &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
 fi
 
-# Build, push on registry and create snips_nlu stack
-docker-compose build && docker-compose push && env $(cat .env | grep ^[A-Z] | xargs) docker stack deploy --compose-file docker-compose.yml snipsnlu
+# Build stack
+privatekey=$(cat ~/.ssh/id_rsa)
+publickey=$(cat ~/.ssh/id_rsa.pub)
+SSH_PRIVATE_KEY="$privatekey" SSH_PUBLIC_KEY="$publickey" docker-compose build
+
+# Push and launch snips_nlu stack
+docker-compose push && env $(cat .env | grep ^[A-Z] | xargs) docker stack deploy --compose-file docker-compose.yml snipsnlu

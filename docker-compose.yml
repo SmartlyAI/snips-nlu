@@ -8,6 +8,11 @@ networks:
 volumes:
   rabbitmq:
     external: true
+  nlu_data:
+    driver_opts:
+      type: "nfs"
+      o: "addr=${IP_SERVER_NFS},nolock,rw"
+      device: ":/snips-data"
 
 services:
   rabbitmq:
@@ -31,17 +36,22 @@ services:
       restart_policy:
         condition: any
   hestia:
+    image: 127.0.0.1:5000/hestia
     build: 
       context: ./hestia
+      args:
+        - NPM_TOKEN
     ports:
       - 3000:3000
     volumes:
-      - /snips-data:/snips-data
+      - /snips-data:/home/hestia/app/snips-data
     environment:
       - RABBITMQ_URL
       - NODE_ENV
+      - API_SMARTLY_ENDPOINT
     networks:
       - snips_nlu_network
+    command: ["./wait-for-it.sh", "rabbitmq", "node", "index"]
     deploy:
       mode: replicated
       replicas: 1
@@ -49,17 +59,21 @@ services:
         constraints: [node.role==manager]
       restart_policy:
         condition: any
-  snips_parse:
+  parse:
+    image: 127.0.0.1:5000/snips_parse
     build: 
       context: ./snips-nlu-parse
+      args:
+        - SSH_PRIVATE_KEY
+        - SSH_PUBLIC_KEY
     ports:
       - 5500:5000
     volumes:
-      - /snips-data:/snips_parse/nfs_server
+      - nlu_data:/snips_parse/nfs_server
     environment:
       - SNIPS_HOST=0.0.0.0
       - SNIPS_PORT=5000
-      - QUEUE_URL
+      - RABBITMQ_URL
       - NSF_SERVER_PATH=/snips_parse/nfs_server
     networks:
       - snips_nlu_network
@@ -67,21 +81,26 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role==manager]
+        constraints: [node.labels.type == parse]
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_parse:smartly_parse_app"]
-  snips_train:
+  train:
+    image: 127.0.0.1:5000/snips_train
     build: 
       context: ./snips-nlu-train
+      args:
+        - SSH_PRIVATE_KEY
+        - SSH_PUBLIC_KEY
     ports:
       - 5400:5000
     volumes:
-      - /snips-data:/snips_train/nfs_server
+      - nlu_data:/snips_train/nfs_server
     environment:
       - SNIPS_HOST=0.0.0.0
       - SNIPS_PORT=5000
-      - QUEUE_URL
+      - RABBITMQ_URL
+      - SSE_REDIS_URL=redis://redis:6379/0
       - NSF_SERVER_PATH=/snips_train/nfs_server
     networks:
       - snips_nlu_network
@@ -89,7 +108,7 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.role==manager]
+        constraints: [node.labels.type == train]
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_train:smartly_train_app"]
