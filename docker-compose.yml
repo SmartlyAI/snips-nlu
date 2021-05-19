@@ -70,14 +70,14 @@ services:
     networks:
         - snips_nlu_network
     volumes:
-        - nlu_data:/mnt:rw
+        - /snips-data:/mnt:rw
     environment:
         - MONGODB_HOST
     deploy:
         mode: replicated
         replicas: 1
         placement:
-            constraints: [node.labels.type == nlurules]
+            constraints: [node.role == manager]
         restart_policy:
             condition: any
   parse:
