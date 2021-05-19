@@ -59,6 +59,27 @@ services:
         constraints: [node.role==manager]
       restart_policy:
         condition: any
+  mars:
+    image: 127.0.0.1:5000/mars
+    build:
+        context: ./mars
+        args:
+            - NPM_TOKEN
+    ports:
+        - "9385:9385"
+    networks:
+        - snips_nlu_network
+    volumes:
+        - nlu_data:/mnt:rw
+    environment:
+        - MONGODB_HOST
+    deploy:
+        mode: replicated
+        replicas: 1
+        placement:
+            constraints: [node.labels.type == nlurules]
+        restart_policy:
+            condition: any
   parse:
     image: 127.0.0.1:5000/snips_parse
     build: 
