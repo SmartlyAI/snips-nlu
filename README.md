@@ -14,7 +14,7 @@
 ## 2- Configure Nginx:
 - launch the _nginx.setup.sh_ script with the following command `sh nginx.setup.sh`.
 
-# To update the web application:
+# To update the NLU application:
 - First, pull the commits of the repo smartly-swarm-azure `git pull`.
 - If necessary: [Second, add new env variables in the file .env (Rarley)]
 - Third, load image from tar file : `bash script.sh load`. The script must be executed in the same directory where docker images are stored.
