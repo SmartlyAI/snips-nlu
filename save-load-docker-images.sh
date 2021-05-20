@@ -41,6 +41,11 @@ save-all-images() {
     name=$(get-image-name $id)
     tag=$(get-image-tag $id)
 
+    # Ignore stale images (tag == <none>)
+    if [[ "$tag" = "<none>" ]]; then
+      continue
+    fi
+    
     if [[ $name =~ / ]]; then
        dir=${name%/*}
        mkdir -p "$directory/$dir"
