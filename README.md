@@ -17,5 +17,6 @@
 # To update the web application:
 - First, pull the commits of the repo smartly-swarm-azure `git pull`.
 - If necessary: [Second, add new env variables in the file .env (Rarley)]
-- Finally, launch the stack `env $(cat .env | grep ^[A-Z] | xargs) docker stack deploy --compose-file docker-compose.yml snipsnlu`.
+- Third, load image from tar file : `bash script.sh load`. The script must be executed in the same directory where docker images are stored.
+- Finally, re-launch the stack `env $(cat .env | grep ^[A-Z] | xargs) docker stack deploy --compose-file docker-compose.yml snipsnlu`.
 
