@@ -1,0 +1,3 @@
+recursive-include snips_nlu_samples *
+include snips_nlu/data/.gitignore
+global-exclude __pycache__ *.py[cod]

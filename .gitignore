@@ -1,0 +1,17 @@
+*.cache
+*.py[cod]
+*.egg-info
+*build
+*.bak
+.idea
+/dist
+/venv
+/venv2
+/venv3
+/venv35
+/venv36
+/venv37
+/.tox
+.coverage
+pylint.log
+.DS_Store
