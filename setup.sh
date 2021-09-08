@@ -22,13 +22,22 @@ else
   cd hestia &&  git fetch && git checkout snips && git pull origin snips && cd ..
 fi
 
-# Cloning mars only if it does not exist
-if [ ! -d "mars" ]; then
-  git clone git@github.com:SmartlyAI/mars.git
-  cd mars && git checkout $1 && cd ..
+# Cloning snips-nlu-parse beta only if it does not exist
+if [ ! -d "snips-nlu-parse-beta" ]; then
+  git clone git@github.com:SmartlyAI/snips-nlu-parse.git snips-nlu-parse-beta
+  cd snips-nlu-parse-beta && git checkout $1 && cd ..
 else
-  echo 'Updating mars repository'
-  cd mars &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
+  echo 'Updating snips-nlu-parse-beta repository'
+  cd snips-nlu-parse-beta &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
+fi
+
+# Cloning snips-nlu-train beta only if it does not exist
+if [ ! -d "snips-nlu-train-beta" ]; then
+  git clone git@github.com:SmartlyAI/snips-nlu-train.git snips-nlu-train-beta
+  cd snips-nlu-train-beta && git checkout $1 && cd ..
+else
+  echo 'Updating snips-nlu-train-beta repository'
+  cd snips-nlu-train-beta &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
 fi
 
 # Cloning snips-nlu-parse only if it does not exist
