@@ -15,7 +15,7 @@ CONFIG = {
                     {
                         "args": {
                             "common_words_gazetteer_name":
-                                "top_200000_words_stemmed",
+                                "top_33000_words_stemmed",
                             "use_stemming": True,
                             "n": 1
                         },
@@ -25,7 +25,7 @@ CONFIG = {
                     {
                         "args": {
                             "common_words_gazetteer_name":
-                                "top_200000_words_stemmed",
+                                "top_33000_words_stemmed",
                             "use_stemming": True,
                             "n": 2
                         },

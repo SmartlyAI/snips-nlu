@@ -72,7 +72,7 @@ SNIPS_TEMPERATURE = "snips/temperature"
 
 # languages
 LANGUAGE_AR = "ar"
-LANGUAGE_DA = "da"
+LANGUAGE_ARY = "ary-ar"
 LANGUAGE_DE = "de"
 LANGUAGE_EN = "en"
 LANGUAGE_ES = "es"

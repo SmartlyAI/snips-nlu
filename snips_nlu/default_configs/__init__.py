@@ -3,8 +3,8 @@ from __future__ import unicode_literals
 from snips_nlu.constants import (
     LANGUAGE_DE, LANGUAGE_EN, LANGUAGE_ES, LANGUAGE_FR, LANGUAGE_IT,
     LANGUAGE_JA, LANGUAGE_KO, LANGUAGE_PT_BR, LANGUAGE_PT_PT,
-    LANGUAGE_AR, LANGUAGE_DA)
-from .config_da import CONFIG as CONFIG_DA
+    LANGUAGE_AR)
+#from .config_ary import CONFIG as CONFIG_ARY
 from .config_ar import CONFIG as CONFIG_AR
 from .config_de import CONFIG as CONFIG_DE
 from .config_en import CONFIG as CONFIG_EN
@@ -17,7 +17,6 @@ from .config_pt_br import CONFIG as CONFIG_PT_BR
 from .config_pt_pt import CONFIG as CONFIG_PT_PT
 
 DEFAULT_CONFIGS = {
-    LANGUAGE_DA: CONFIG_DA,
     LANGUAGE_AR: CONFIG_AR,
     LANGUAGE_DE: CONFIG_DE, 
     LANGUAGE_EN: CONFIG_EN,

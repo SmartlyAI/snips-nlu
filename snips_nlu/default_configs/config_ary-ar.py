@@ -4,12 +4,8 @@ CONFIG = {
     "unit_name": "nlu_engine",
     "intent_parsers_configs": [
         {
-            "unit_name": "deterministic_intent_parser",
-            "ignore_stop_words": True
-        },        
-        {
             "unit_name": "lookup_intent_parser",
-            "ignore_stop_words": False
+            "ignore_stop_words": True
         },
         {
             "unit_name": "probabilistic_intent_parser",
@@ -19,7 +15,7 @@ CONFIG = {
                     {
                         "args": {
                             "common_words_gazetteer_name":
-                                "top_10000_words_stemmed",
+                                "top_33000_words_stemmed",
                             "use_stemming": True,
                             "n": 1
                         },
@@ -29,12 +25,34 @@ CONFIG = {
                     {
                         "args": {
                             "common_words_gazetteer_name":
-                                "top_10000_words_stemmed",
+                                "top_33000_words_stemmed",
                             "use_stemming": True,
                             "n": 2
                         },
                         "factory_name": "ngram",
                         "offsets": [-2, 1]
+                    },
+                    {
+                        "args": {
+                            "prefix_size": 2
+                        },
+                        "factory_name": "prefix",
+                        "offsets": [0]
+                    },
+                    {
+                        "args": {"prefix_size": 5},
+                        "factory_name": "prefix",
+                        "offsets": [0]
+                    },
+                    {
+                        "args": {"suffix_size": 2},
+                        "factory_name": "suffix",
+                        "offsets": [0]
+                    },
+                    {
+                        "args": {"suffix_size": 5},
+                        "factory_name": "suffix",
+                        "offsets": [0]
                     },
                     {
                         "args": {},
@@ -97,14 +115,12 @@ CONFIG = {
                 ],
                 "crf_args": {
                     "c1": 0.1,
-                    "c2": 0.2,
-                    "algorithm": "lbfgs",
-                    "delta": 1e-4,
-                    #"verbose": True
+                    "c2": 0.1,
+                    "algorithm": "lbfgs"
                 },
                 "tagging_scheme": 1,
                 "data_augmentation_config": {
-                    "min_utterances": 1000,
+                    "min_utterances": 200,
                     "capitalization_ratio": 0.2,
                     "add_builtin_entities_examples": True
                 }
@@ -112,17 +128,17 @@ CONFIG = {
             "intent_classifier_config": {
                 "unit_name": "log_reg_intent_classifier",
                 "data_augmentation_config": {
-                    "min_utterances": 500,
-                    "noise_factor": 6,
-                    "add_builtin_entities_examples": True,
+                    "min_utterances": 20,
+                    "noise_factor": 5,
+                    "add_builtin_entities_examples": False,
                     "max_unknown_words": None,
                     "unknown_word_prob": 0.0,
                     "unknown_words_replacement_string": None
                 },
                 "featurizer_config": {
                     "unit_name": "featurizer",
-                    "pvalue_threshold": 0.1,
-                    "added_cooccurrence_feature_ratio": 0.3,
+                    "pvalue_threshold": 0.4,
+                    "added_cooccurrence_feature_ratio": 0.0,
                     "tfidf_vectorizer_config": {
                         "unit_name": "tfidf_vectorizer",
                         "use_stemming": True,
