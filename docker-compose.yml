@@ -59,27 +59,59 @@ services:
         constraints: [node.role==manager]
       restart_policy:
         condition: any
-  mars:
-    image: 127.0.0.1:5000/mars
-    build:
-        context: ./mars
-        args:
-            - NPM_TOKEN
+  parsebeta:
+    image: 127.0.0.1:5000/snips_parse_beta
+    build: 
+      context: ./snips-nlu-parse-beta
+      args:
+        - SSH_PRIVATE_KEY
+        - SSH_PUBLIC_KEY
     ports:
-        - "9385:9385"
-    networks:
-        - snips_nlu_network
+      - 6500:6000
     volumes:
-        - /snips-data:/mnt:rw
+      - nlu_data:/snips_parse/nfs_server
     environment:
-        - MONGODB_HOST
+      - SNIPS_HOST=0.0.0.0
+      - SNIPS_PORT=6000
+      - RABBITMQ_URL
+      - NSF_SERVER_PATH=/snips_parse/nfs_server
+    networks:
+      - snips_nlu_network
     deploy:
-        mode: replicated
-        replicas: 1
-        placement:
-            constraints: [node.role == manager]
-        restart_policy:
-            condition: any
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.labels.type == parsebeta]
+      restart_policy:
+        condition: any
+    command: ["gunicorn", "-b 0.0.0.0:6000", "--reload", "run_parse:smartly_parse_app"]
+  trainbeta:
+    image: 127.0.0.1:5000/snips_train_beta
+    build: 
+      context: ./snips-nlu-train-beta
+      args:
+        - SSH_PRIVATE_KEY
+        - SSH_PUBLIC_KEY
+    ports:
+      - 6400:6000
+    volumes:
+      - nlu_data:/snips_train/nfs_server
+    environment:
+      - SNIPS_HOST=0.0.0.0
+      - SNIPS_PORT=6000
+      - RABBITMQ_URL
+      - SSE_REDIS_URL=redis://redis:6379/0
+      - NSF_SERVER_PATH=/snips_train/nfs_server
+    networks:
+      - snips_nlu_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.labels.type == train]
+      restart_policy:
+        condition: any
+    command: ["gunicorn", "-b 0.0.0.0:6000", "--reload", "run_train:smartly_train_app"]
   parse:
     image: 127.0.0.1:5000/snips_parse
     build: 
