@@ -4,15 +4,10 @@
 - Docker Version: 20.10.5
 - Docker-compose Version: 1.28.5
 
-# To deploy from scratch on production:
-
-## 1- Install/launch NLU stack:
+# To install NLU stack:
 - First, you need to get the docker images of services that form the NLU stack
 - Second, you need to add .env file which contains the environment variable used by docker-compose.
 - Third, launch the _setup.sh_ script with the following command `bash setup.sh`.
-
-## 2- Configure Nginx:
-- launch the _nginx.setup.sh_ script with the following command `sh nginx.setup.sh`.
 
 # To update the NLU stack:
 - First, pull the new commits of this repo `git pull`.
