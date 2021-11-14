@@ -8,6 +8,7 @@ from snips_nlu.common.utils import unicode_string
 from snips_nlu.dataset.entity import Entity
 from snips_nlu.dataset.intent import Intent
 from snips_nlu.exceptions import DatasetFormatError
+from snips_nlu.constants import ARABE_VARIANTS
 
 
 class Dataset(object):
@@ -210,8 +211,12 @@ class Dataset(object):
         from snips_nlu_parsers import get_builtin_entity_examples
 
         if entity.is_builtin:
-            return cycle(get_builtin_entity_examples(
-                entity.name, self.language))
+            if self.language in ARABE_VARIANTS:
+                return cycle(get_builtin_entity_examples(
+                    entity.name, "fr"))
+            else:
+                return cycle(get_builtin_entity_examples(
+                    entity.name, self.language))
         values = [v for utterance in entity.utterances
                   for v in utterance.variations]
         values_set = set(values)

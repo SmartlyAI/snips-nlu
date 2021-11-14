@@ -29,8 +29,7 @@ def load_resources(name, required_resources=None):
             dict which, when provided, allows to limit the amount of resources
             to load. By default, all existing resources are loaded.
     """
-    if name == "ary-ar" or name == "ary":
-        name = "ar"
+    if name.startswith('ary'): name = "ar"
     if name in set(d.name for d in DATA_PATH.iterdir()):
         return load_resources_from_dir(DATA_PATH / name, required_resources)
     elif is_package(name):

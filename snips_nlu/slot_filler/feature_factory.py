@@ -13,7 +13,7 @@ from snips_nlu.common.utils import check_random_state
 from snips_nlu.constants import (
     CUSTOM_ENTITY_PARSER_USAGE, END, GAZETTEERS, LANGUAGE, RES_MATCH_RANGE,
     START, STEMS, WORD_CLUSTERS, CUSTOM_ENTITY_PARSER, BUILTIN_ENTITY_PARSER,
-    RESOURCES, RANDOM_STATE, AUTOMATICALLY_EXTENSIBLE, ENTITIES)
+    RESOURCES, RANDOM_STATE, AUTOMATICALLY_EXTENSIBLE, ENTITIES, ARABE_VARIANTS)
 from snips_nlu.dataset import (
     extract_intent_entities, get_dataset_gazetteer_entities)
 from snips_nlu.entity_parser.builtin_entity_parser import is_builtin_entity
@@ -613,6 +613,7 @@ class BuiltinEntityMatchFactory(CRFFeatureFactory):
         from snips_nlu_parsers import get_supported_grammar_entities
 
         language = dataset[LANGUAGE]
+        if language in ARABE_VARIANTS: language = 'fr'
         grammar_entities = list(get_supported_grammar_entities(language))
         gazetteer_entities = list(
             get_dataset_gazetteer_entities(dataset, intent))

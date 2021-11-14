@@ -7,7 +7,7 @@ from itertools import cycle
 from future.utils import iteritems
 
 from snips_nlu.constants import (
-    CAPITALIZE, DATA, ENTITIES, ENTITY, INTENTS, TEXT, UTTERANCES)
+    CAPITALIZE, DATA, ENTITIES, ENTITY, INTENTS, TEXT, UTTERANCES, ARABE_VARIANTS)
 from snips_nlu.entity_parser.builtin_entity_parser import is_builtin_entity
 from snips_nlu.languages import get_default_sep
 from snips_nlu.preprocessing import tokenize_light
@@ -71,8 +71,12 @@ def get_entities_iterators(intent_entities, language,
     for entity_name, entity in iteritems(intent_entities):
         utterance_values = random_state.permutation(sorted(entity[UTTERANCES]))
         if add_builtin_entities_examples and is_builtin_entity(entity_name):
-            entity_examples = get_builtin_entity_examples(
-                entity_name, language)
+            if language in ARABE_VARIANTS:
+                entity_examples = get_builtin_entity_examples(
+                    entity_name, 'fr')
+            else: 
+                entity_examples = get_builtin_entity_examples(
+                    entity_name, language)
             # Builtin entity examples must be kept first in the iterator to
             # ensure that they are used when augmenting data
             iterator_values = entity_examples + list(utterance_values)
