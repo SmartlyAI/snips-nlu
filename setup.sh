@@ -22,40 +22,58 @@ else
   cd hestia &&  git fetch && git checkout snips && git pull origin snips && cd ..
 fi
 
-# Cloning snips-nlu-parse beta only if it does not exist
-if [ ! -d "snips-nlu-parse-beta" ]; then
-  git clone git@github.com:SmartlyAI/snips-nlu-parse.git snips-nlu-parse-beta
-  cd snips-nlu-parse-beta && git checkout $1 && cd ..
+# Cloning snips-nlu-parse 1.05 only if it does not exist
+if [ ! -d "snips-nlu-parse-105" ]; then
+  git clone git@github.com:SmartlyAI/snips-nlu-parse.git snips-nlu-parse-105
+  cd snips-nlu-parse-105 && git checkout snips/1.05 && cd ..
 else
-  echo 'Updating snips-nlu-parse-beta repository'
-  cd snips-nlu-parse-beta &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
+  echo 'Updating snips-nlu-parse-105 repository'
+  cd snips-nlu-parse-105 &&  git fetch && git checkout snips/1.05 && git pull origin snips/1.05 && cd ..
 fi
 
-# Cloning snips-nlu-train beta only if it does not exist
-if [ ! -d "snips-nlu-train-beta" ]; then
-  git clone git@github.com:SmartlyAI/snips-nlu-train.git snips-nlu-train-beta
-  cd snips-nlu-train-beta && git checkout $1 && cd ..
+# Cloning snips-nlu-train 1.05 only if it does not exist
+if [ ! -d "snips-nlu-train-105" ]; then
+  git clone git@github.com:SmartlyAI/snips-nlu-train.git snips-nlu-train-105
+  cd snips-nlu-train-105 && git checkout snips/1.05 && cd ..
 else
-  echo 'Updating snips-nlu-train-beta repository'
-  cd snips-nlu-train-beta &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
+  echo 'Updating snips-nlu-train-105 repository'
+  cd snips-nlu-train-105 &&  git fetch && git checkout snips/1.05 && git pull origin snips/1.05 && cd ..
 fi
 
-# Cloning snips-nlu-parse only if it does not exist
-if [ ! -d "snips-nlu-parse" ]; then
-  git clone git@github.com:SmartlyAI/snips-nlu-parse.git
-  cd snips-nlu-parse && git checkout $1 && cd ..
+# Cloning snips-nlu-parse 1.04 only if it does not exist
+if [ ! -d "snips-nlu-parse-104" ]; then
+  git clone git@github.com:SmartlyAI/snips-nlu-parse.git snips-nlu-parse-104
+  cd snips-nlu-parse-104 && git checkout snips/1.04 && cd ..
 else
-  echo 'Updating snips-nlu-parse repository'
-  cd snips-nlu-parse &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
+  echo 'Updating snips-nlu-parse-104 repository'
+  cd snips-nlu-parse-104 &&  git fetch && git checkout snips/1.04 && git pull origin snips/1.04 && cd ..
 fi
 
-# Cloning snips-nlu-train only if it does not exist
-if [ ! -d "snips-nlu-train" ]; then
- git clone git@github.com:SmartlyAI/snips-nlu-train.git
- cd snips-nlu-train && git checkout $1 && cd ..
+# Cloning snips-nlu-train 1.04 only if it does not exist
+if [ ! -d "snips-nlu-train-104" ]; then
+ git clone git@github.com:SmartlyAI/snips-nlu-train.git snips-nlu-train-104
+ cd snips-nlu-train-104 && git checkout snips/1.04 && cd ..
 else
-  echo 'Updating snips-nlu-train repository'
-  cd snips-nlu-train &&  git fetch && git checkout $1 && git pull origin $1 && cd ..
+  echo 'Updating snips-nlu-train-104 repository'
+  cd snips-nlu-train-104 &&  git fetch && git checkout snips/1.04 && git pull origin snips/1.04 && cd ..
+fi
+
+# Cloning snips-nlu-parse 1.06 only if it does not exist
+if [ ! -d "snips-nlu-parse-106" ]; then
+  git clone git@github.com:SmartlyAI/snips-nlu-parse.git snips-nlu-parse-106
+  cd snips-nlu-parse-106 && git checkout snips/1.06 && cd ..
+else
+  echo 'Updating snips-nlu-parse-106 repository'
+  cd snips-nlu-parse-106 &&  git fetch && git checkout snips/1.06 && git pull origin snips/1.06 && cd ..
+fi
+
+# Cloning snips-nlu-train 1.06 only if it does not exist
+if [ ! -d "snips-nlu-train-106" ]; then
+ git clone git@github.com:SmartlyAI/snips-nlu-train.git snips-nlu-train-106
+ cd snips-nlu-train-106 && git checkout snips/1.06 && cd ..
+else
+  echo 'Updating snips-nlu-train-106 repository'
+  cd snips-nlu-train-106 &&  git fetch && git checkout snips/1.06 && git pull origin snips/1.06 && cd ..
 fi
 
 # Build stack
