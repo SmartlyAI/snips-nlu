@@ -59,10 +59,10 @@ services:
         constraints: [node.role==manager]
       restart_policy:
         condition: any
-  parsebeta:
-    image: 127.0.0.1:5000/snips_parse_beta
+  parse105:
+    image: 127.0.0.1:5000/snips_parse_105
     build: 
-      context: ./snips-nlu-parse-beta
+      context: ./snips-nlu-parse-105
       args:
         - SSH_PRIVATE_KEY
         - SSH_PUBLIC_KEY
@@ -85,10 +85,10 @@ services:
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:6000", "--reload", "run_parse:smartly_parse_app"]
-  trainbeta:
-    image: 127.0.0.1:5000/snips_train_beta
+  train105:
+    image: 127.0.0.1:5000/snips_train_105
     build: 
-      context: ./snips-nlu-train-beta
+      context: ./snips-nlu-train-105
       args:
         - SSH_PRIVATE_KEY
         - SSH_PUBLIC_KEY
@@ -112,10 +112,10 @@ services:
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:6000", "--reload", "run_train:smartly_train_app"]
-  parse:
-    image: 127.0.0.1:5000/snips_parse
+  parse104:
+    image: 127.0.0.1:5000/snips_parse_104
     build: 
-      context: ./snips-nlu-parse
+      context: ./snips-nlu-parse-104
       args:
         - SSH_PRIVATE_KEY
         - SSH_PUBLIC_KEY
@@ -138,10 +138,10 @@ services:
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_parse:smartly_parse_app"]
-  train:
-    image: 127.0.0.1:5000/snips_train
+  train104:
+    image: 127.0.0.1:5000/snips_train_104
     build: 
-      context: ./snips-nlu-train
+      context: ./snips-nlu-train-104
       args:
         - SSH_PRIVATE_KEY
         - SSH_PUBLIC_KEY
@@ -165,3 +165,56 @@ services:
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:5000", "--reload", "run_train:smartly_train_app"]
+  parse106:
+    image: 127.0.0.1:5000/snips_parse_106
+    build: 
+      context: ./snips-nlu-parse-106
+      args:
+        - SSH_PRIVATE_KEY
+        - SSH_PUBLIC_KEY
+    ports:
+      - 6900:4200
+    volumes:
+      - nlu_data:/snips_parse/nfs_server
+    environment:
+      - SNIPS_HOST=0.0.0.0
+      - SNIPS_PORT=4200
+      - RABBITMQ_URL
+      - NSF_SERVER_PATH=/snips_parse/nfs_server
+    networks:
+      - snips_nlu_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.labels.type == parsemodelarabe]
+      restart_policy:
+        condition: any
+    command: ["gunicorn", "-b 0.0.0.0:4200", "--reload", "run_parse:smartly_parse_app"]
+  train106:
+    image: 127.0.0.1:5000/snips_train_106
+    build: 
+      context: ./snips-nlu-train-106
+      args:
+        - SSH_PRIVATE_KEY
+        - SSH_PUBLIC_KEY
+    ports:
+      - 6880:4300
+    volumes:
+      - nlu_data:/snips_train/nfs_server
+    environment:
+      - SNIPS_HOST=0.0.0.0
+      - SNIPS_PORT=4300
+      - RABBITMQ_URL
+      - SSE_REDIS_URL=redis://redis:6379/0
+      - NSF_SERVER_PATH=/snips_train/nfs_server
+    networks:
+      - snips_nlu_network
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.labels.type == train]
+      restart_policy:
+        condition: any
+    command: ["gunicorn", "-b 0.0.0.0:4300", "--reload", "run_train:smartly_train_app"]
