@@ -1,0 +1,69 @@
+filebeat.autodiscover:
+  providers:
+    - type: docker
+      templates:
+        - condition:
+            contains:
+              docker.container.name: smartlyai
+          config:
+            - type: container
+              paths:
+                - /usr/share/dockerlogs/data/${data.docker.container.id}/*.log
+              multiline.type: pattern
+              multiline.pattern: '^[[:space:]]'
+              multiline.negate: false
+              multiline.match: after
+
+filebeat.inputs:
+  - type: docker
+    containers.ids:
+      - "*"
+
+processors:
+- drop_event:
+    when:
+      regexp:
+        message: '(?i).*healthcheck.*'
+
+  # decode the log field (sub JSON document) if JSON encoded, then maps it's fields to elasticsearch fields
+- decode_json_fields:
+    fields: ["log", "message"]
+    target: ""
+    # overwrite existing target elasticsearch fields while decoding json fields    
+    overwrite_keys: true
+- add_docker_metadata:
+    host: "unix:///var/run/docker.sock"
+
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+#==================== Elasticsearch template setting ==========================
+setup.template.enabled: true
+setup.template.name: "smartly-nlu"
+setup.template.pattern: "smartly-nlu-*"
+
+#-------------------------- Elasticsearch output ------------------------------
+output.elasticsearch:
+  # Boolean flag to enable or disable the output module.
+  enabled: true
+
+  hosts: ["ELK_LOGS_HOST:9200"]
+
+  index: "smartly-nlu-%{+YYYY.MM.dd}"
+
+#============================== Setup ILM =====================================
+setup.ilm.enabled: false
+setup.ilm.overwrite: false
+
+# Write Filebeat own logs only to file to avoid catching them with itself in docker log files
+logging.level: error
+logging.to_files: false
+logging.to_syslog: false
+loggins.metrice.enabled: false
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+ssl.verification_mode: none

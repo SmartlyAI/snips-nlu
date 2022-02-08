@@ -15,6 +15,25 @@ volumes:
       device: ":/snips-data"
 
 services:
+  filebeat:
+    image: 127.0.0.1:5000/filebeat
+    build:
+      context: ./filebeat
+      args:
+        - ELK_LOGS_HOST
+    networks:
+      - snips_nlu_network
+    volumes:
+      # needed to access all docker logs (read only) :
+      - "/var/lib/docker/containers:/usr/share/dockerlogs/data:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock"
+    deploy:
+      mode: replicated
+      replicas: 1
+      placement:
+        constraints: [node.role==manager]
+      restart_policy:
+        condition: any
   rabbitmq:
     image: rabbitmq:3.8.14-management-alpine
     volumes:
