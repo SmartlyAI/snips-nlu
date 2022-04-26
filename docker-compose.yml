@@ -100,7 +100,7 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.labels.type == parse]
+        constraints: [node.labels.type == parsebeta]
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:6000", "--reload", "run_parse:smartly_parse_app"]
@@ -127,7 +127,7 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.labels.type == train]
+        constraints: [node.labels.type == trainbeta]
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:6000", "--reload", "run_train:smartly_train_app"]
@@ -206,7 +206,7 @@ services:
       mode: replicated
       replicas: 1
       placement:
-        constraints: [node.labels.type == parse]
+        constraints: [node.labels.type == parsemodelarabe]
       restart_policy:
         condition: any
     command: ["gunicorn", "-b 0.0.0.0:4200", "--reload", "run_parse:smartly_parse_app"]
