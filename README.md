@@ -10,5 +10,6 @@
 - Third, launch the _setup.sh_ script with the following command `bash setup.sh magenta-develop`.
 
 ## To install Nginx/Amplify:
+- Add the content of file nginx/limits.conf  to /etc/security/limits.conf. It's allow to change ulimit of the host machine.
 - launch the _nginx.setup.sh_ script with the following command `env $(cat .env | grep ^[A-Z] | xargs) sh nginx.setup.sh`.
 
