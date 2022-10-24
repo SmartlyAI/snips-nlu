@@ -79,8 +79,8 @@ class SnipsNLUEngine(ProcessingUnit):
         """Whether or not the nlu engine has already been fitted"""
         return self.dataset_metadata is not None
 
-    @log_elapsed_time(
-        logger, logging.INFO, "Fitted NLU engine in {elapsed_time}")
+    '''@log_elapsed_time(
+        logger, logging.INFO, "Fitted NLU engine in {elapsed_time}")'''
     def fit(self, dataset, force_retrain=True):
         """Fits the NLU engine
 
