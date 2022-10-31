@@ -128,8 +128,8 @@ class SnipsNLUEngine(ProcessingUnit):
         self.dataset_metadata = _get_dataset_metadata(dataset)
         return self
 
-    '''@log_elapsed_time(logger, logging.DEBUG, "Parsed input in {elapsed_time}")'''
-    @fitted_required
+    #@log_elapsed_time(logger, logging.DEBUG, "Parsed input in {elapsed_time}")
+    #@fitted_required
     def parse(self, text, intents=None, top_n=None):
         """Performs intent parsing on the provided *text* by calling its intent
         parsers successively
