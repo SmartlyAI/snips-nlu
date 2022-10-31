@@ -152,7 +152,7 @@ class ProbabilisticIntentParser(IntentParser):
             results.append(extraction_result(intent_result, slots))
         return results
 
-    @fitted_required
+    #@fitted_required
     def get_intents(self, text):
         """Returns the list of intents ordered by decreasing probability
 
