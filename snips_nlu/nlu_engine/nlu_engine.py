@@ -195,8 +195,8 @@ class SnipsNLUEngine(ProcessingUnit):
             results.append(extraction_result(intent_res, slots))
         return results
 
-    @log_elapsed_time(logger, logging.DEBUG, "Got intents in {elapsed_time}")
-    @fitted_required
+    '''@log_elapsed_time(logger, logging.DEBUG, "Got intents in {elapsed_time}")
+    @fitted_required'''
     def get_intents(self, text):
         """Performs intent classification on the provided *text* and returns
         the list of intents ordered by decreasing probability
