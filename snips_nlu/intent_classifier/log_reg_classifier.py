@@ -116,7 +116,7 @@ class LogRegIntentClassifier(IntentClassifier):
         logger.debug("%s", DifferedLoggingMessage(self.log_best_features))
         return self
 
-    @fitted_required
+    #@fitted_required
     def get_intent(self, text, intents_filter=None):
         """Performs intent classification on the provided *text*
 
@@ -137,7 +137,7 @@ class LogRegIntentClassifier(IntentClassifier):
         """
         return self._get_intents(text, intents_filter)[0]
 
-    @fitted_required
+    #@fitted_required
     def get_intents(self, text):
         """Performs intent classification on the provided *text* and returns
         the list of intents ordered by decreasing probability
