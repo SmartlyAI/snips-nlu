@@ -46,8 +46,7 @@ class ProbabilisticIntentParser(IntentParser):
                and all(slot_filler is not None and slot_filler.fitted
                        for slot_filler in itervalues(self.slot_fillers))
 
-    @log_elapsed_time(logger, logging.INFO,
-                      "Fitted probabilistic intent parser in {elapsed_time}")
+    #@log_elapsed_time(logger, logging.INFO, "Fitted probabilistic intent parser in {elapsed_time}")
     # pylint:disable=arguments-differ
     def fit(self, dataset, force_retrain=True):
         """Fits the probabilistic intent parser
@@ -98,11 +97,11 @@ class ProbabilisticIntentParser(IntentParser):
 
     # pylint:enable=arguments-differ
 
-    @log_result(logger, logging.DEBUG,
+    '''@log_result(logger, logging.DEBUG,
                 "ProbabilisticIntentParser result -> {result}")
     @log_elapsed_time(logger, logging.DEBUG,
-                      "ProbabilisticIntentParser parsed in {elapsed_time}")
-    @fitted_required
+                      "ProbabilisticIntentParser parsed in {elapsed_time}")'''
+    '''@fitted_required'''
     def parse(self, text, intents=None, top_n=None):
         """Performs intent parsing on the provided *text* by first classifying
         the intent and then using the correspond slot filler to extract slots
@@ -161,7 +160,7 @@ class ProbabilisticIntentParser(IntentParser):
         """
         return self.intent_classifier.get_intents(text)
 
-    @fitted_required
+    #@fitted_required
     def get_slots(self, text, intent):
         """Extracts slots from a text input, with the knowledge of the intent
 
