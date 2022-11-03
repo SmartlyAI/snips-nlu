@@ -135,7 +135,6 @@ class Featurizer(ProcessingUnit):
         # and fit(x, y).transform(x)
         return self.tfidf_vectorizer.transform(x)
 
-    breakpoint()
     def _fit_cooccurrence_vectorizer(self, x, classes, none_class, dataset):
         import numpy as np
         from sklearn.feature_selection import chi2
