@@ -647,7 +647,7 @@ class CooccurrenceVectorizer(ProcessingUnit):
             ]
         return enriched_utterance
 
-    @fitted_required
+    #@fitted_required
     def transform(self, x):
         """Computes the cooccurrence feature matrix.
 
