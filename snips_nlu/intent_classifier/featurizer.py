@@ -647,7 +647,7 @@ class CooccurrenceVectorizer(ProcessingUnit):
             ]
         return enriched_utterance
 
-    @fitted_required
+    #@fitted_required
     def transform(self, x):
         """Computes the cooccurrence feature matrix.
 
@@ -671,6 +671,9 @@ class CooccurrenceVectorizer(ProcessingUnit):
             self._enrich_utterance(utterance, builtin_ents, custom_ent)
             for utterance, builtin_ents, custom_ent in zip(*preprocessed)]
 
+        if self.word_pairs == None:
+            self._word_pairs = {}
+            
         x_coo = sp.dok_matrix((len(x), len(self.word_pairs)), dtype=np.int32)
         for i, u in enumerate(utterances):
             for p in self._extract_word_pairs(u):
