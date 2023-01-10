@@ -1,3 +1,4 @@
 from .intent_classifier import IntentClassifier
 from .log_reg_classifier import LogRegIntentClassifier
+from .random_forest_classifier import RandForIntentClassifier
 from .featurizer import Featurizer, CooccurrenceVectorizer, TfidfVectorizer
