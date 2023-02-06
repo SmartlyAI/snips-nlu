@@ -77,17 +77,24 @@ class Featurizer(ProcessingUnit):
         dataset = validate_and_format_dataset(dataset)
         self.language = dataset[LANGUAGE]
 
+        # Generator yielding utterances as Strings:
         utterances_texts = (get_text_from_chunks(u[DATA]) for u in utterances)
-        if not any(tokenize_light(q, self.language) for q in utterances_texts):
-            raise _EmptyDatasetUtterancesError(
-                "Tokenized utterances are empty")
 
-        x_tfidf = self._fit_transform_tfidf_vectorizer(
-            utterances, classes, dataset)
+        # If there are no utterances:
+        if not any(tokenize_light(q, self.language) for q in utterances_texts):
+            raise _EmptyDatasetUtterancesError("Tokenized utterances are empty")
+
+        # Fit TF-IDF vectorizer AND does khi-2 feature selection => returns sparse matrix of columns: significant words, rows: all utterances
+        x_tfidf = self._fit_transform_tfidf_vectorizer(utterances, classes, dataset)
+
+        # X: explanatory variables/input:
         x = x_tfidf
+
+        # If the cooccurrence ratio is in the config:
         if self.config.added_cooccurrence_feature_ratio:
-            self._fit_cooccurrence_vectorizer(
-                utterances, classes, none_class, dataset)
+
+            # Fit cooccurrence vector:
+            self._fit_cooccurrence_vectorizer(utterances, classes, none_class, dataset)
             x_cooccurrence = self.cooccurrence_vectorizer.transform(utterances)
             x = sp.hstack((x_tfidf, x_cooccurrence))
 
@@ -105,6 +112,7 @@ class Featurizer(ProcessingUnit):
     def _fit_transform_tfidf_vectorizer(self, x, y, dataset):
         from sklearn.feature_selection import chi2
 
+        # Instantiate TF-IDF:
         self.tfidf_vectorizer = TfidfVectorizer(
             config=self.config.tfidf_vectorizer_config,
             builtin_entity_parser=self.builtin_entity_parser,
@@ -112,27 +120,35 @@ class Featurizer(ProcessingUnit):
             resources=self.resources,
             random_state=self.random_state,
         )
+
+        # Apply vectorizer => vectorized data BEFORE removing insignificant columns:
         x_tfidf = self.tfidf_vectorizer.fit_transform(x, dataset)
 
+        # If list of unique words is empty:
         if not self.tfidf_vectorizer.vocabulary:
-            raise _EmptyDatasetUtterancesError(
-                "Dataset is empty or with empty utterances")
-        _, tfidf_pval = chi2(x_tfidf, y)
-        best_tfidf_features = set(i for i, v in enumerate(tfidf_pval)
-                                  if v < self.config.pvalue_threshold)
-        if not best_tfidf_features:
-            best_tfidf_features = set(
-                idx for idx, val in enumerate(tfidf_pval) if
-                val == tfidf_pval.min())
+            raise _EmptyDatasetUtterancesError("Dataset is empty or with empty utterances")
 
-        best_ngrams = [ng for ng, i in
-                       iteritems(self.tfidf_vectorizer.vocabulary)
-                       if i in best_tfidf_features]
+        # Khi-2 feature selection:
+        _, tfidf_pval = chi2(x_tfidf, y)
+
+        # Set of features that fall below p-value:
+        best_tfidf_features = set(i for i, v in enumerate(tfidf_pval) if v < self.config.pvalue_threshold)
+
+        # If not features are significative:
+        if not best_tfidf_features:
+            best_tfidf_features = set(idx for idx, val in enumerate(tfidf_pval) if val == tfidf_pval.min())
+
+        best_ngrams = [ng for ng, i in iteritems(self.tfidf_vectorizer.vocabulary) if i in best_tfidf_features]
+
+        # Only keep the significant columns (features/words): 
         self.tfidf_vectorizer.limit_vocabulary(best_ngrams)
+
         # We can't return x_tfidf[:best_tfidf_features] because of the
         # normalization in the transform of the tfidf_vectorizer
         # this would lead to inconsistent result between: fit_transform(x, y)
         # and fit(x, y).transform(x)
+
+        # Repeat TF-IDF only on the best features:
         return self.tfidf_vectorizer.transform(x)
 
     def _fit_cooccurrence_vectorizer(self, x, classes, none_class, dataset):
@@ -140,6 +156,7 @@ class Featurizer(ProcessingUnit):
         from sklearn.feature_selection import chi2
 
         non_null_x = (d for d, c in zip(x, classes) if c != none_class)
+
         self.cooccurrence_vectorizer = CooccurrenceVectorizer(
             config=self.config.cooccurrence_vectorizer_config,
             builtin_entity_parser=self.builtin_entity_parser,
@@ -147,10 +164,14 @@ class Featurizer(ProcessingUnit):
             resources=self.resources,
             random_state=self.random_state,
         )
-        x_cooccurrence = self.cooccurrence_vectorizer.fit(
-            non_null_x, dataset).transform(x)
+
+        # Fit cooccurrence vectorizer based on word-pair occurrence:
+        x_cooccurrence = self.cooccurrence_vectorizer.fit(non_null_x, dataset).transform(x)
+
+        # If there are no word pairs just return the featurizer (nothing to fit):
         if not self.cooccurrence_vectorizer.word_pairs:
             return self
+
         _, pval = chi2(x_cooccurrence, classes)
 
         top_k = int(self.config.added_cooccurrence_feature_ratio * len(
@@ -267,6 +288,8 @@ class TfidfVectorizer(ProcessingUnit):
         self.fit_custom_entity_parser_if_needed(dataset)
 
         self._language = dataset[LANGUAGE]
+
+        #
         self._init_vectorizer(self._language)
         self.builtin_entity_scope = set(
             e for e in dataset[ENTITIES] if is_builtin_entity(e))
@@ -299,15 +322,23 @@ class TfidfVectorizer(ProcessingUnit):
         self.fit_custom_entity_parser_if_needed(dataset)
 
         self._language = dataset[LANGUAGE]
+
+        # Initialize vectorizer and define the tokenizer within it:
         self._init_vectorizer(self._language)
-        self.builtin_entity_scope = set(
-            e for e in dataset[ENTITIES] if is_builtin_entity(e))
+
+        self.builtin_entity_scope = set(e for e in dataset[ENTITIES] if is_builtin_entity(e))
+
+        # Formatted data: tuple of => utterances, system entities, custom entities and word clusters
         preprocessed_data = self._preprocess(x)
+
+        # List of utterances => with some entities-related processing:
         utterances = [
             self._enrich_utterance(u, builtin_ents, custom_ents, w_clusters)
             for u, builtin_ents, custom_ents, w_clusters
             in zip(*preprocessed_data)
         ]
+
+        # Return TF-IDF sparse matrix => rows are documents (i.e. utterances) and columns are *unique* words (i.e. vocabulary):
         return self._tfidf_vectorizer.fit_transform(utterances)
 
     @property
@@ -376,16 +407,11 @@ class TfidfVectorizer(ProcessingUnit):
 
         return normalized_utterances, builtin_ents, custom_ents, w_clusters
 
-    def _enrich_utterance(self, utterance, builtin_entities, custom_entities,
-                          word_clusters):
-        custom_entities_features = [
-            _entity_name_to_feature(e[ENTITY_KIND], self.language)
-            for e in custom_entities]
+    def _enrich_utterance(self, utterance, builtin_entities, custom_entities,word_clusters):
 
-        builtin_entities_features = [
-            _builtin_entity_to_feature(ent[ENTITY_KIND], self.language)
-            for ent in builtin_entities
-        ]
+        custom_entities_features = [_entity_name_to_feature(e[ENTITY_KIND], self.language) for e in custom_entities]
+
+        builtin_entities_features = [_builtin_entity_to_feature(ent[ENTITY_KIND], self.language) for ent in builtin_entities]
 
         # We remove values of builtin slots from the utterance to avoid
         # learning specific samples such as '42' or 'tomorrow'
@@ -463,11 +489,9 @@ class TfidfVectorizer(ProcessingUnit):
         return None
 
     def _init_vectorizer(self, language):
-        from sklearn.feature_extraction.text import (
-            TfidfVectorizer as SklearnTfidfVectorizer)
+        from sklearn.feature_extraction.text import (TfidfVectorizer as SklearnTfidfVectorizer)
 
-        self._tfidf_vectorizer = SklearnTfidfVectorizer(
-            tokenizer=lambda x: tokenize_light(x, language))
+        self._tfidf_vectorizer = SklearnTfidfVectorizer(tokenizer=lambda x: tokenize_light(x, language))
         return self
 
     @check_persisted_path

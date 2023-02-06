@@ -96,6 +96,7 @@ def add_unknown_word_to_utterances(utterances, replacement_string,
     if not max_unknown_words:
         return utterances
 
+
     new_utterances = deepcopy(utterances)
     for u in new_utterances:
         if random_state.rand() < unknown_word_prob:
@@ -111,36 +112,58 @@ def add_unknown_word_to_utterances(utterances, replacement_string,
     return new_utterances
 
 
-def build_training_data(dataset, language, data_augmentation_config, resources,
-                        random_state):
+def build_training_data(dataset, language, data_augmentation_config, resources,random_state):
+
     import numpy as np
 
     # Create class mapping
+
+    # Dictionary of intent IDs and their utterances, entities:
     intents = dataset[INTENTS]
+
+    # Mapping dictionary of class name-index:
     intent_index = 0
     classes_mapping = dict()
     for intent in sorted(intents):
         classes_mapping[intent] = intent_index
         intent_index += 1
 
+    # Noise class' index is the last index:
     noise_class = intent_index
+    
 
+    # Augment utterances:
     augmented_utterances = []
     utterance_classes = []
+
+    # For each intent:
     for intent_name, intent_data in sorted(iteritems(intents)):
+
+        # Number of utterances in current intent:
         nb_utterances = len(intent_data[UTTERANCES])
-        min_utterances_to_generate = max(
-            data_augmentation_config.min_utterances, nb_utterances)
+
+        # Minimum of utterances is the biggest of the number of utterances and "min_utterances" parameter:
+        min_utterances_to_generate = max(data_augmentation_config.min_utterances, nb_utterances)
+
+        # Original utterances + augmented ones:
         utterances = augment_utterances(
-            dataset, intent_name, language=language,
+            dataset,
+            intent_name,
+            language=language,
             min_utterances=min_utterances_to_generate,
-            capitalization_ratio=0.0,
-            add_builtin_entities_examples=
-            data_augmentation_config.add_builtin_entities_examples,
-            resources=resources, random_state=random_state)
+            capitalization_ratio = 0.0,
+            add_builtin_entities_examples = data_augmentation_config.add_builtin_entities_examples,
+            resources=resources,
+            random_state=random_state)
+
+        # Append final utterances:
         augmented_utterances += utterances
-        utterance_classes += [classes_mapping[intent_name] for _ in
-                              range(len(utterances))]
+
+        # Create and append indices for the new augmented data:
+        utterance_classes += [classes_mapping[intent_name] for _ in range(len(utterances))]
+
+
+    # Skipped by default:
     if data_augmentation_config.unknown_words_replacement_string is not None:
         augmented_utterances = add_unknown_word_to_utterances(
             augmented_utterances,
@@ -151,22 +174,41 @@ def build_training_data(dataset, language, data_augmentation_config, resources,
         )
 
     # Adding noise
+    # List of noise utterances from noise.txt file:
     noise = get_noise(resources)
-    noisy_utterances = generate_noise_utterances(
-        augmented_utterances, noise, len(intents), data_augmentation_config,
-        language, random_state)
 
+    # Format the noise utterances into data dict like the other utterances:
+    noisy_utterances = generate_noise_utterances(augmented_utterances, noise, len(intents), data_augmentation_config, language, random_state)
+
+    # Add noisy utterances to final augmented utterances:
     augmented_utterances += noisy_utterances
+
+    # Append every data dict of the noise class to the augmented classes:
     utterance_classes += [noise_class for _ in noisy_utterances]
+
+    # If there are noisy utterances:
     if noisy_utterances:
+
+        # Its index mapping will be the last int index "noise_class" arrived at:
         classes_mapping[NOISE_NAME] = noise_class
 
+    # Number of classes:
     nb_classes = len(set(itervalues(classes_mapping)))
+
+    # List of Nones:
     intent_mapping = [None for _ in range(nb_classes)]
+
+    # For each intent name & intent index pair:
     for intent, intent_class in iteritems(classes_mapping):
+
+        # If it's the None intent:
         if intent == NOISE_NAME:
+
+            # Put it's index as key and None as its name:
             intent_mapping[intent_class] = None
+        
         else:
+            # Put index as key and intent name as value:
             intent_mapping[intent_class] = intent
 
     return augmented_utterances, np.array(utterance_classes), intent_mapping

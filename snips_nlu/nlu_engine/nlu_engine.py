@@ -93,6 +93,8 @@ class SnipsNLUEngine(ProcessingUnit):
             The same object, trained.
         """
         dataset = validate_and_format_dataset(dataset)
+
+        # If not config dict was supplied when instantiating SnipsNLUEngine:
         if self.config is None:
             language = dataset[LANGUAGE]
             default_config = DEFAULT_CONFIGS.get(language)
@@ -103,27 +105,42 @@ class SnipsNLUEngine(ProcessingUnit):
         self.load_resources_if_needed(dataset[LANGUAGE]) 
         self.fit_builtin_entity_parser_if_needed(dataset) 
         self.fit_custom_entity_parser_if_needed(dataset)
+
         parsers = []
+
+        # For each unit config in the input config dictionary:
         for parser_config in self.config.intent_parsers_configs:
+
             # Re-use existing parsers to allow pre-training
             recycled_parser = None
             for parser in self.intent_parsers:
                 if parser.unit_name == parser_config.unit_name:
                     recycled_parser = parser
                     break 
+            
+            # If None => instantiate new untrained parser:
             if recycled_parser is None:
+
+                # Instances of the parsers using "from_config" (implemented from ProcessingUnit)
+                # Returns "Deterministic Parser", "Probabilistic intent parser", etc.
                 recycled_parser = IntentParser.from_config(
-                    parser_config,
-                    builtin_entity_parser=self.builtin_entity_parser,
+
+                    parser_config,                                      # config dict we instantiate SnipsNLUEngine with
+                    builtin_entity_parser=self.builtin_entity_parser,   # remaining lines: content of '**extra' dictionary
                     custom_entity_parser=self.custom_entity_parser,
                     resources=self.resources,
                     random_state=self.random_state
                 )
+
+            # Train current parser:
             if force_retrain or not recycled_parser.fitted: 
                 try: recycled_parser.fit(dataset, force_retrain)
-                except Exception as e: print('Error recycled_parser.fitted', str(e)) 
+                except Exception as e: print('Error recycled_parser.fitted', str(e))
+            
+            # Append final trained parser:
             parsers.append(recycled_parser)
 
+        # Store list of parsers in an attribute:
         self.intent_parsers = parsers
         self.dataset_metadata = _get_dataset_metadata(dataset)
         return self

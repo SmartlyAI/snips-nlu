@@ -95,7 +95,8 @@ def tokenize_light(string, language):
     """Same behavior as :func:`tokenize` but returns tokenized strings instead
         of :class:`Token` objects"""
     from snips_nlu_utils import tokenize_light as _tokenize_light
-    if language not in SUPPORTED_LANGUAGES: language = 'fr'
+    if language not in SUPPORTED_LANGUAGES:
+        language = 'fr'
 
     tokenized_string = _tokenize_light(string, language)
     return tokenized_string

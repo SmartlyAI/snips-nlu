@@ -6,15 +6,13 @@ from builtins import range, str, zip
 from pathlib import Path
 
 from snips_nlu.common.log_utils import DifferedLoggingMessage, log_elapsed_time
-from snips_nlu.common.utils import (
-    check_persisted_path, fitted_required, json_string)
+from snips_nlu.common.utils import check_persisted_path, fitted_required, json_string
 from snips_nlu.constants import LANGUAGE, RES_PROBA
 from snips_nlu.dataset import validate_and_format_dataset
 from snips_nlu.exceptions import LoadingError, _EmptyDatasetUtterancesError
 from snips_nlu.intent_classifier.featurizer import Featurizer
 from snips_nlu.intent_classifier.intent_classifier import IntentClassifier
-from snips_nlu.intent_classifier.log_reg_classifier_utils import (
-    build_training_data, get_regularization_factor, text_to_utterance)
+from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, get_regularization_factor, text_to_utterance
 from snips_nlu.pipeline.configs import LogRegIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
 
@@ -74,15 +72,23 @@ class LogRegIntentClassifier(IntentClassifier):
         self.fit_custom_entity_parser_if_needed(dataset)
         language = dataset[LANGUAGE]
         
+        # Get augmentation config:
         data_augmentation_config = self.config.data_augmentation_config
-        utterances, classes, intent_list = build_training_data(
-            dataset, language, data_augmentation_config, self.resources,
-            self.random_state)
 
+        # Build the initial dataset (augmentation, noise etc without the features, TF-IDF etc):
+        # utterances: dictionary of utterances and entities
+        # classes: list of ints with class indices
+        # intent_list: list of intent names plus 'None'
+        utterances, classes, intent_list = build_training_data(dataset, language, data_augmentation_config, self.resources, self.random_state)
+
+        # Save list of intents:
         self.intent_list = intent_list
+
+        # If there's only one or less intents return untrained LogReg without featurization::
         if len(self.intent_list) <= 1:
             return self
 
+        # Instantiate featurizer:
         self.featurizer = Featurizer(
             config=self.config.featurizer_config,
             builtin_entity_parser=self.builtin_entity_parser,
@@ -90,12 +96,17 @@ class LogRegIntentClassifier(IntentClassifier):
             resources=self.resources,
             random_state=self.random_state,
         )
+
+        # Featurizer's language:
         self.featurizer.language = language
 
+        # Index of none class is the max of classes (i.e. last positon):
         none_class = max(classes)
+
+        # Apply featurizer:
         try:
-            x = self.featurizer.fit_transform(
-                dataset, utterances, classes, none_class)
+            x = self.featurizer.fit_transform(dataset, utterances, classes, none_class)
+            
         except _EmptyDatasetUtterancesError:
             logger.warning("No (non-empty) utterances found in dataset")
             self.featurizer = None

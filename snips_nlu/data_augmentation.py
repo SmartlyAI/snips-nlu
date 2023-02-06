@@ -45,15 +45,31 @@ def capitalize_utterances(utterances, entities, language, ratio, resources,
 
 
 def generate_utterance(contexts_iterator, entities_iterators):
+
+    # Intent circular list that holds data dictionary:
     context = deepcopy(next(contexts_iterator))
+
+    # List to fill with final augmented data:
     context_data = []
+
+    # For each 'text'-utt dict (i.e. chunk):
     for chunk in context[DATA]:
+
+        # If the "entity" key is in the dictionary (i.e. if there's an entity in the utterance):
         if ENTITY in chunk:
-            chunk[TEXT] = deepcopy(
-                next(entities_iterators[chunk[ENTITY]]))
+
+            # Get first entity in utterance:
+            chunk[TEXT] = deepcopy(next(entities_iterators[chunk[ENTITY]]))
+        
+        # Append empty space to utterance:
         chunk[TEXT] = chunk[TEXT].strip() + " "
+
+        # Append the final reseult:
         context_data.append(chunk)
+    
+    # Over-write the old dictionary entry:
     context[DATA] = context_data
+
     return context
 
 
@@ -63,25 +79,34 @@ def get_contexts_iterator(dataset, intent_name, random_state):
     return cycle(shuffled_utterances)
 
 
-def get_entities_iterators(intent_entities, language,
-                           add_builtin_entities_examples, random_state):
+def get_entities_iterators(intent_entities, language, add_builtin_entities_examples, random_state):
     from snips_nlu_parsers import get_builtin_entity_examples
 
+    # Empty dict:
     entities_its = dict()
+
+    # For each entity:
     for entity_name, entity in iteritems(intent_entities):
+
+        # Shuffled utterances:
         utterance_values = random_state.permutation(sorted(entity[UTTERANCES]))
+
+        # Add builtin entity examples:
         if add_builtin_entities_examples and is_builtin_entity(entity_name):
+
+            # Check if language is Arabic:
             if language in ARABE_VARIANTS:
-                entity_examples = get_builtin_entity_examples(
-                    entity_name, 'fr')
+                entity_examples = get_builtin_entity_examples(entity_name, 'fr')
             else: 
-                entity_examples = get_builtin_entity_examples(
-                    entity_name, language)
+                entity_examples = get_builtin_entity_examples(entity_name, language)
+
             # Builtin entity examples must be kept first in the iterator to
             # ensure that they are used when augmenting data
             iterator_values = entity_examples + list(utterance_values)
         else:
             iterator_values = utterance_values
+        
+        # Create circular list of 'data' dictionaries:
         entities_its[entity_name] = cycle(iterator_values)
     return entities_its
 
@@ -100,26 +125,30 @@ def num_queries_to_generate(dataset, intent_name, min_utterances):
     return max(nb_utterances, min_utterances)
 
 
-def augment_utterances(dataset, intent_name, language, min_utterances,
-                       capitalization_ratio, add_builtin_entities_examples,
-                       resources, random_state):
+def augment_utterances(dataset, intent_name, language, min_utterances, capitalization_ratio, add_builtin_entities_examples, resources, random_state):
+
+    # Returns circular list of utterances for the current intent:
     contexts_it = get_contexts_iterator(dataset, intent_name, random_state)
-    intent_entities = {e: dataset[ENTITIES][e]
-                       for e in get_intent_entities(dataset, intent_name)}
-    entities_its = get_entities_iterators(intent_entities, language,
-                                          add_builtin_entities_examples,
-                                          random_state)
+
+    # Dictionary of entities:
+    intent_entities = {e: dataset[ENTITIES][e] for e in get_intent_entities(dataset, intent_name)}
+
+    # Circular list for entities:
+    entities_its = get_entities_iterators(intent_entities, language, add_builtin_entities_examples, random_state)
+
+    # Integer for number of utterances to generate => maximum between "min_utterances" parameter and number of utterances in intent:
+    nb_to_generate = num_queries_to_generate(dataset, intent_name, min_utterances)
+
+    # Start generating utterances:
     generated_utterances = []
-    nb_to_generate = num_queries_to_generate(dataset, intent_name,
-                                             min_utterances)
+
+    # While nb_to_generate is still positive (not exhausted by decrementing to 0):
     while nb_to_generate > 0:
         generated_utterance = generate_utterance(contexts_it, entities_its)
         generated_utterances.append(generated_utterance)
         nb_to_generate -= 1
 
-    generated_utterances = capitalize_utterances(
-        generated_utterances, dataset[ENTITIES], language,
-        ratio=capitalization_ratio, resources=resources,
-        random_state=random_state)
+    # Returns capitalized version of the utterances:
+    generated_utterances = capitalize_utterances(generated_utterances, dataset[ENTITIES], language, ratio=capitalization_ratio, resources=resources, random_state=random_state)
 
     return generated_utterances
