@@ -48,6 +48,7 @@ class LogRegIntentClassifier(IntentClassifier):
         self.classifier = None
         self.intent_list = None
         self.featurizer = None
+        self.final_train_data = None
 
     @property
     def fitted(self):
@@ -106,6 +107,7 @@ class LogRegIntentClassifier(IntentClassifier):
         # Apply featurizer:
         try:
             x = self.featurizer.fit_transform(dataset, utterances, classes, none_class)
+            self.final_train_data = x
             
         except _EmptyDatasetUtterancesError:
             logger.warning("No (non-empty) utterances found in dataset")
