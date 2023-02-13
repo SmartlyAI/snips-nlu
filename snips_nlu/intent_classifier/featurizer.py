@@ -96,6 +96,8 @@ class Featurizer(ProcessingUnit):
             # Fit cooccurrence vector:
             self._fit_cooccurrence_vectorizer(utterances, classes, none_class, dataset)
             x_cooccurrence = self.cooccurrence_vectorizer.transform(utterances)
+
+            # Append cooccurrence columns to the prior TF-IDF columns:
             x = sp.hstack((x_tfidf, x_cooccurrence))
 
         return x
@@ -172,24 +174,21 @@ class Featurizer(ProcessingUnit):
         if not self.cooccurrence_vectorizer.word_pairs:
             return self
 
+        # Feature selection for coccurrences:
         _, pval = chi2(x_cooccurrence, classes)
 
-        top_k = int(self.config.added_cooccurrence_feature_ratio * len(
-            self.tfidf_vectorizer.idf_diag))
+        top_k = int(self.config.added_cooccurrence_feature_ratio * len(self.tfidf_vectorizer.idf_diag))
 
         # No selection if k is greater or equal than the number of word pairs
         if top_k >= len(self.cooccurrence_vectorizer.word_pairs):
             return self
 
-        top_k_cooccurrence_ix = np.argpartition(
-            pval, top_k - 1, axis=None)[:top_k]
-        top_k_cooccurrence_ix = set(top_k_cooccurrence_ix)
-        top_word_pairs = [
-            pair for pair, i in iteritems(
-                self.cooccurrence_vectorizer.word_pairs)
-            if i in top_k_cooccurrence_ix
-        ]
+        top_k_cooccurrence_ix = np.argpartition(pval, top_k - 1, axis=None)[:top_k]
 
+        top_k_cooccurrence_ix = set(top_k_cooccurrence_ix)
+        top_word_pairs = [pair for pair, i in iteritems(self.cooccurrence_vectorizer.word_pairs) if i in top_k_cooccurrence_ix]
+        
+        # Only keep most significant word pairs (i.e. cooccurrences):
         self.cooccurrence_vectorizer.limit_word_pairs(top_word_pairs)
         return self
 
