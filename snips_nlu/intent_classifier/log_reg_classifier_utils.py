@@ -194,7 +194,7 @@ def build_training_data(dataset, language, data_augmentation_config, resources,r
 
                 # If utt has only one word => remove whole utterance so we're not left with empty string:
                 if len(noisy_utt.split()) == 1:
-                    del noisy_utt[i]
+                    del noise[i]
                 else:
                     noise[i] = noisy_utt.replace(word, '').strip()
     
