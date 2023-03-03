@@ -188,16 +188,10 @@ def build_training_data(dataset, language, data_augmentation_config, resources,r
                     dataset_unique_words.add(word)
 
     # Remove words from noise utterance if words exist on dataset:
-    for i, noisy_utt in enumerate(noise):
-        for word in noisy_utt.split():
-            if word in dataset_unique_words:
+    for word in dataset_unique_words:
+      if word in noise:
+        noise = [noise_word for noise_word in noise if noise_word != word]
 
-                # If utt has only one word => remove whole utterance so we're not left with empty string:
-                if len(noisy_utt.split()) == 1:
-                    del noise[i]
-                else:
-                    noise[i] = noisy_utt.replace(word, '').strip()
-    
     
     # Format the noise utterances into data dict like the other utterances:
     noisy_utterances = generate_noise_utterances(augmented_utterances, noise, len(intents), data_augmentation_config, language, random_state)
