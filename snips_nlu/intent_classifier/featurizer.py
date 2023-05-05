@@ -20,7 +20,7 @@ from snips_nlu.exceptions import (_EmptyDatasetUtterancesError, LoadingError)
 from snips_nlu.languages import get_default_sep
 from snips_nlu.pipeline.configs import FeaturizerConfig
 from snips_nlu.pipeline.configs.intent_classifier import (
-    CooccurrenceVectorizerConfig, TfidfVectorizerConfig, FastTextVectorizerConfig)
+    CooccurrenceVectorizerConfig, VectorizerConfig)
 from snips_nlu.pipeline.processing_unit import ProcessingUnit
 from snips_nlu.preprocessing import stem, tokenize_light
 from snips_nlu.resources import get_stop_words, get_word_cluster
@@ -37,8 +37,6 @@ class Featurizer(ProcessingUnit):
     def __init__(self, config=None, **shared):
         super(Featurizer, self).__init__(config, **shared)
         self.language = None
-
-        # TODO: rename attribute to simply "vectorizer":
         self.vectorizer = None
         self.cooccurrence_vectorizer = None
 
@@ -249,7 +247,7 @@ class Featurizer(ProcessingUnit):
 @ProcessingUnit.register("fasttext_vectorizer")
 class FastTextVectorizer(ProcessingUnit):
 
-    config_type = FastTextVectorizerConfig
+    config_type = VectorizerConfig
 
     def __init__(self, config=None, **shared):
         super(FastTextVectorizer, self).__init__(config, **shared)
@@ -357,7 +355,7 @@ class FastTextVectorizer(ProcessingUnit):
 class TfidfVectorizer(ProcessingUnit):
     """Wrapper of the scikit-learn TfidfVectorizer"""
 
-    config_type = TfidfVectorizerConfig
+    config_type = VectorizerConfig
 
     def __init__(self, config=None, **shared):
         super(TfidfVectorizer, self).__init__(config, **shared)

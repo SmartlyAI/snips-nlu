@@ -22,7 +22,7 @@ from snips_nlu.intent_classifier.log_reg_classifier_utils import (
     text_to_utterance)
 from snips_nlu.pipeline.configs import FeaturizerConfig
 from snips_nlu.pipeline.configs.intent_classifier import (
-    CooccurrenceVectorizerConfig, TfidfVectorizerConfig)
+    CooccurrenceVectorizerConfig, VectorizerConfig)
 from snips_nlu.tests.utils import (
     FixtureTest, get_empty_dataset, EntityParserMock)
 
@@ -606,7 +606,7 @@ values:
             text_to_utterance("Bird birdy"),
         ]
 
-        config = TfidfVectorizerConfig(
+        config = VectorizerConfig(
             use_stemming=True, word_clusters_name="my_word_clusters")
         vectorizer = TfidfVectorizer(
             config=config,
