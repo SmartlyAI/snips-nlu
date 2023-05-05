@@ -138,8 +138,7 @@ class ProcessingUnit(with_metaclass(ABCMeta, Registrable)):
         # fitted or if the parser is none.
         # In the other cases the parser is provided fitted by another unit.
         if self.builtin_entity_parser is None or self.fitted:
-            self.builtin_entity_parser = BuiltinEntityParser.build(
-                dataset=dataset)
+            self.builtin_entity_parser = BuiltinEntityParser.build(dataset=dataset)
         return self
 
     def fit_custom_entity_parser_if_needed(self, dataset):
@@ -147,8 +146,7 @@ class ProcessingUnit(with_metaclass(ABCMeta, Registrable)):
         # fitted or if the parser is none.
         # In the other cases the parser is provided fitted by another unit.
         required_resources = self.config.get_required_resources()
-        if not required_resources or not required_resources.get(
-                CUSTOM_ENTITY_PARSER_USAGE):
+        if not required_resources or not required_resources.get(CUSTOM_ENTITY_PARSER_USAGE):
             # In these cases we need a custom entity parser only to do the
             # final slot resolution step, which must be done without stemming.
             parser_usage = CustomEntityParserUsage.WITHOUT_STEMS
@@ -157,8 +155,7 @@ class ProcessingUnit(with_metaclass(ABCMeta, Registrable)):
 
         if self.custom_entity_parser is None or self.fitted:
             self.load_resources_if_needed(dataset[LANGUAGE])
-            self.custom_entity_parser = CustomEntityParser.build(
-                dataset, parser_usage, self.resources)
+            self.custom_entity_parser = CustomEntityParser.build(dataset, parser_usage, self.resources)
         return self
 
     def persist_metadata(self, path, **kwargs):

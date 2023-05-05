@@ -283,8 +283,7 @@ class LogRegIntentClassifier(IntentClassifier):
         featurizer = model_dict['featurizer']
         if featurizer is not None:
             featurizer_path = path / featurizer
-            intent_classifier.featurizer = Featurizer.from_path(
-                featurizer_path, **shared)
+            intent_classifier.featurizer = Featurizer.from_path(featurizer_path, **shared)
 
         return intent_classifier
 

@@ -149,6 +149,7 @@ class FeaturizerConfig(FromDict, ProcessingUnitConfig):
     # pylint: disable=line-too-long
     def __init__(self, tfidf_vectorizer_config=None,
                  cooccurrence_vectorizer_config=None,
+                 fasttext_vectorizer_config=None,
                  pvalue_threshold=0.4,
                  added_cooccurrence_feature_ratio=0):
         """
@@ -172,22 +173,35 @@ class FeaturizerConfig(FromDict, ProcessingUnitConfig):
                 cooccurrence features will be added
         """
         self.pvalue_threshold = pvalue_threshold
-        self.added_cooccurrence_feature_ratio = \
-            added_cooccurrence_feature_ratio
+        self.added_cooccurrence_feature_ratio = added_cooccurrence_feature_ratio
 
+        #! TF-IDF config:
         if tfidf_vectorizer_config is None:
             tfidf_vectorizer_config = TfidfVectorizerConfig()
+
         elif isinstance(tfidf_vectorizer_config, dict):
-            tfidf_vectorizer_config = TfidfVectorizerConfig.from_dict(
-                tfidf_vectorizer_config)
+            tfidf_vectorizer_config = TfidfVectorizerConfig.from_dict(tfidf_vectorizer_config)
+
         self.tfidf_vectorizer_config = tfidf_vectorizer_config
 
+        #! Cooccurrence config:
         if cooccurrence_vectorizer_config is None:
             cooccurrence_vectorizer_config = CooccurrenceVectorizerConfig()
+
         elif isinstance(cooccurrence_vectorizer_config, dict):
-            cooccurrence_vectorizer_config = CooccurrenceVectorizerConfig \
-                .from_dict(cooccurrence_vectorizer_config)
+            cooccurrence_vectorizer_config = CooccurrenceVectorizerConfig.from_dict(cooccurrence_vectorizer_config)
+            
         self.cooccurrence_vectorizer_config = cooccurrence_vectorizer_config
+
+
+        #! FastText config:
+        if fasttext_vectorizer_config is None:
+            fasttext_vectorizer_config = FastTextVectorizerConfig()
+
+        elif isinstance(fasttext_vectorizer_config, dict):
+            fasttext_vectorizer_config = FastTextVectorizerConfig.from_dict(fasttext_vectorizer_config)
+
+        self.fasttext_vectorizer_config = fasttext_vectorizer_config
 
     # pylint: enable=line-too-long
 
@@ -197,25 +211,47 @@ class FeaturizerConfig(FromDict, ProcessingUnitConfig):
         return Featurizer.unit_name
 
     def get_required_resources(self):
-        required_resources = self.tfidf_vectorizer_config \
-            .get_required_resources()
+
+        required_resources = self.tfidf_vectorizer_config.get_required_resources()
+
         if self.cooccurrence_vectorizer_config:
-            required_resources = merge_required_resources(
-                required_resources,
-                self.cooccurrence_vectorizer_config.get_required_resources())
+            required_resources = merge_required_resources(required_resources, self.cooccurrence_vectorizer_config.get_required_resources())
         return required_resources
 
     def to_dict(self):
         return {
             "unit_name": self.unit_name,
             "pvalue_threshold": self.pvalue_threshold,
-            "added_cooccurrence_feature_ratio":
-                self.added_cooccurrence_feature_ratio,
+            "added_cooccurrence_feature_ratio": self.added_cooccurrence_feature_ratio,
             "tfidf_vectorizer_config": self.tfidf_vectorizer_config.to_dict(),
-            "cooccurrence_vectorizer_config":
-                self.cooccurrence_vectorizer_config.to_dict(),
+            "fastext_vectorizer_config": self.fasttext_vectorizer_config.to_dict(),
+            "cooccurrence_vectorizer_config": self.cooccurrence_vectorizer_config.to_dict(),
         }
 
+
+class FastTextVectorizerConfig(FromDict, ProcessingUnitConfig):
+    def __init__(self, word_clusters_name=None, use_stemming=False):
+
+        self.word_clusters_name = word_clusters_name
+        self.use_stemming = use_stemming
+
+        @property
+        def unit_name(self):
+            from snips_nlu.intent_classifier import FastTextVectorizer
+            return FastTextVectorizer.unit_name
+
+        def get_required_resources(self):
+            resources = {STEMS: True if self.use_stemming else False}
+            if self.word_clusters_name:
+                resources[WORD_CLUSTERS] = {self.word_clusters_name}
+            return resources
+
+        def to_dict(self):
+            return {
+                "unit_name": self.unit_name,
+                "word_clusters_name": self.word_clusters_name,
+                "use_stemming": self.use_stemming
+            }
 
 class TfidfVectorizerConfig(FromDict, ProcessingUnitConfig):
     """Configuration of a :class:`.TfidfVectorizerConfig` object"""
@@ -235,8 +271,8 @@ class TfidfVectorizerConfig(FromDict, ProcessingUnitConfig):
 
     @property
     def unit_name(self):
-        from snips_nlu.intent_classifier import TfidfVectorizer
-        return TfidfVectorizer.unit_name
+        from snips_nlu.intent_classifier import VectorizerFactory
+        return VectorizerFactory.unit_name
 
     def get_required_resources(self):
         resources = {STEMS: True if self.use_stemming else False}

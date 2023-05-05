@@ -133,7 +133,7 @@ utterances:
 
         # Then
         self.assertEqual(language, featurizer.language)
-        self.assertEqual("tfidf_vectorizer", featurizer.tfidf_vectorizer)
+        self.assertEqual("tfidf_vectorizer", featurizer.vectorizer)
         self.assertEqual("cooccurrence_vectorizer",
                          featurizer.cooccurrence_vectorizer)
         self.assertDictEqual(config.to_dict(), featurizer.config.to_dict())
@@ -259,7 +259,7 @@ values:
         mocked_tfidf_vectorizer.vocabulary = {"a": 0}
 
         featurizer.cooccurrence_vectorizer = mocked_cooccurrence_vectorizer
-        featurizer.tfidf_vectorizer = mocked_tfidf_vectorizer
+        featurizer.vectorizer = mocked_tfidf_vectorizer
 
         # Then
         expected = {
@@ -293,7 +293,7 @@ values:
         mocked_vectorizer = MagicMock()
         mocked_vectorizer.idf_diag = range(10)
 
-        featurizer.tfidf_vectorizer = mocked_vectorizer
+        featurizer.vectorizer = mocked_vectorizer
         classes = [0, 0, 1]
 
         # When
