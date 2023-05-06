@@ -351,6 +351,14 @@ class FastTextVectorizer(ProcessingUnit):
         return compress_fasttext.models.CompressedFastTextKeyedVectors.load('/resources/embeddings/cc.fr.300-quantized')
 
 
+    # Doesn't need to be persisted (pre-trained model) => pass because it's an abstract method:    
+    def persist(self, path):
+        pass
+
+    # FasText is pre-trained, so it's always fitted (i.e. always True):
+    def fitted(self):
+        return True
+
 @ProcessingUnit.register("tfidf_vectorizer")
 class TfidfVectorizer(ProcessingUnit):
     """Wrapper of the scikit-learn TfidfVectorizer"""
