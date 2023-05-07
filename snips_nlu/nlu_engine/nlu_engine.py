@@ -140,7 +140,7 @@ class SnipsNLUEngine(ProcessingUnit):
             # Train current parser:
             if force_retrain or not recycled_parser.fitted: 
                 try: recycled_parser.fit(dataset, force_retrain)
-                except Exception as e: print('Error recycled_parser.fitted', str(e))
+                except Exception as e: print('ERROR - recycled_parser.fitted', str(e))
             
             # Append final trained parser:
             parsers.append(recycled_parser)

@@ -255,6 +255,11 @@ class FastTextVectorizer(ProcessingUnit):
         self._language = None
         self.builtin_entity_scope = None
 
+    # Simply calls "fit_transform" (to stay consistent with the "Featurizer" API):
+    def transform(self, x, dataset):
+        return self.fit_transform(x,dataset)
+    
+    # Fit the FastText vectorizer:
     def fit_transform(self, x, dataset):
 
         # Instantiate TF-IDF:
