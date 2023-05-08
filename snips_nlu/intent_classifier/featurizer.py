@@ -264,7 +264,7 @@ class FastTextVectorizer(ProcessingUnit):
     def fit_transform(self, x, dataset):
 
         # Instantiate TF-IDF:
-        self.fasttext_vectorizer = FastTextVectorizer(config=self.config.fasttext_vectorizer_config,
+        self.fasttext_vectorizer = FastTextVectorizer(config=self.config,
                                                 builtin_entity_parser=self.builtin_entity_parser,
                                                 custom_entity_parser=self.custom_entity_parser,
                                                 resources=self.resources,
@@ -354,7 +354,7 @@ class FastTextVectorizer(ProcessingUnit):
 
     def from_path(self, path=None, **shared):
         import compress_fasttext
-        return compress_fasttext.models.CompressedFastTextKeyedVectors.load('/resources/embeddings/cc.fr.300-quantized')
+        return compress_fasttext.models.CompressedFastTextKeyedVectors.load('./resources/embeddings/cc.fr.300-quantized')
 
 
     # Doesn't need to be persisted (pre-trained model) => pass because it's an abstract method:    
@@ -364,6 +364,12 @@ class FastTextVectorizer(ProcessingUnit):
     # FasText is pre-trained, so it's always fitted (i.e. always True):
     def fitted(self):
         return True
+    
+    @property
+    def language(self):
+        # Create this getter to prevent the language from being set elsewhere than in the fit
+        return self._language
+    
 
 @ProcessingUnit.register("tfidf_vectorizer")
 class TfidfVectorizer(ProcessingUnit):
