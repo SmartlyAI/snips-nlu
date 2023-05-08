@@ -89,7 +89,7 @@ class Featurizer(ProcessingUnit):
         # X: explanatory variables/input:
         x = x_vectorized
 
-        # If the cooccurrence ratio is in the config:
+        # Only fit the Cooccurrence Vectorizer if "added_cooccurrence_feature_ratio" exists in the config:
         if self.config.added_cooccurrence_feature_ratio:
 
             # Fit cooccurrence vector:
@@ -255,9 +255,10 @@ class FastTextVectorizer(ProcessingUnit):
         self._language = None
         self.builtin_entity_scope = None
 
-    # Simply calls "fit_transform" (to stay consistent with the "Featurizer" API):
-    def transform(self, x, dataset):
-        return self.fit_transform(x,dataset)
+    # Simply calls "fit_transform" (to stay consistent with the "Featurizer" API)
+    # We don't need "y" for the FastText vectorizer but we keep it for consistency:
+    def transform(self, x, y, dataset):
+        return self.fit_transform(x, dataset)
     
     # Fit the FastText vectorizer:
     def fit_transform(self, x, dataset):
