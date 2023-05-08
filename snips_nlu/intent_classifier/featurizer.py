@@ -270,6 +270,13 @@ class FastTextVectorizer(ProcessingUnit):
                                                 resources=self.resources,
                                                 random_state=self.random_state,
                                                 )
+        
+
+        # Fit entity parsers and get resources:
+        self.load_resources_if_needed(dataset[LANGUAGE])
+        self.fit_builtin_entity_parser_if_needed(dataset)
+        self.fit_custom_entity_parser_if_needed(dataset)
+        
         # Set language:
         self._language = dataset[LANGUAGE]
         
