@@ -122,7 +122,7 @@ class Featurizer(ProcessingUnit):
     def _fit_transform_vectorizer(self, x, y, dataset, vectorizer_name):
 
         # Get required vectorizer through Factory:
-        self.vectorizer = VectorizerFactory(vectorizer_name)
+        self.vectorizer = VectorizerFactory(vectorizer_name, self.config)
 
         # We can't return x_tfidf[:best_tfidf_features] because of the
         # normalization in the transform of the tfidf_vectorizer
@@ -160,7 +160,7 @@ class Featurizer(ProcessingUnit):
 
         top_k = int(self.config.added_cooccurrence_feature_ratio * len(self.vectorizer.idf_diag))
 
-        # No selection if k is greater or equal than the number of word pairs
+        # No selection if k is greater or equal than the number of word pairs (keep everything)
         if top_k >= len(self.cooccurrence_vectorizer.word_pairs):
             return self
 
@@ -466,8 +466,7 @@ class TfidfVectorizer(ProcessingUnit):
 
     @property
     def fitted(self):
-        return self._tfidf_vectorizer is not None and hasattr(
-            self._tfidf_vectorizer, "vocabulary_")
+        return self._tfidf_vectorizer is not None and hasattr(self._tfidf_vectorizer, "vocabulary_")
 
     @fitted_required
     def transform(self, x, y, dataset):
@@ -645,8 +644,7 @@ class TfidfVectorizer(ProcessingUnit):
 
     @property
     def idf_diag(self):
-        if self._tfidf_vectorizer and hasattr(
-                self._tfidf_vectorizer, "vocabulary_"):
+        if self._tfidf_vectorizer and hasattr(self._tfidf_vectorizer, "vocabulary_"):
             return self._tfidf_vectorizer.idf_
         return None
 
@@ -982,13 +980,13 @@ class CooccurrenceVectorizer(ProcessingUnit):
         return self
 
 
-def VectorizerFactory(vectorizer_name):
+def VectorizerFactory(vectorizer_name, featurizer_config):
 
     if vectorizer_name == 'tfidf':
-        return TfidfVectorizer()
+        return TfidfVectorizer(featurizer_config)
     
     elif vectorizer_name == 'fasttext':
-        return FastTextVectorizer()
+        return FastTextVectorizer(featurizer_config)
 
 def _entity_name_to_feature(entity_name, language):
     return "entityfeature%s" % "".join(tokenize_light(entity_name.lower(), language))
