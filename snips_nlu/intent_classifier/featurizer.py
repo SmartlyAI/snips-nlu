@@ -300,7 +300,7 @@ class FastTextVectorizer(ProcessingUnit):
         for u in normalized_utterances:
             nb_chunks = len(u[DATA])
             for i, chunk in enumerate(u[DATA]):
-                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, self.config.use_stemming)
+                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, self.config.vectorizer_config.use_stemming)
                 if i < nb_chunks - 1:
                     chunk[TEXT] += " "
 
@@ -317,14 +317,14 @@ class FastTextVectorizer(ProcessingUnit):
                 get_text_from_chunks(u[DATA]), use_cache=True)
             for u in normalized_utterances
         ]
-        if self.config.word_clusters_name:
+        if self.config.vectorizer_config.word_clusters_name:
             # Extract world clusters on unormalized utterances
             original_utterances_text = [get_text_from_chunks(u[DATA])
                                         for u in utterances]
             w_clusters = [
                 _get_word_cluster_features(
                     tokenize_light(u.lower(), self.language),
-                    self.config.word_clusters_name,
+                    self.config.vectorizer_config.word_clusters_name,
                     self.resources)
                 for u in original_utterances_text
             ]
@@ -532,7 +532,7 @@ class TfidfVectorizer(ProcessingUnit):
         for u in normalized_utterances:
             nb_chunks = len(u[DATA])
             for i, chunk in enumerate(u[DATA]):
-                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, self.config.use_stemming)
+                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, self.config.vectorizer_config.use_stemming)
                 if i < nb_chunks - 1:
                     chunk[TEXT] += " "
 
@@ -549,14 +549,14 @@ class TfidfVectorizer(ProcessingUnit):
                 get_text_from_chunks(u[DATA]), use_cache=True)
             for u in normalized_utterances
         ]
-        if self.config.word_clusters_name:
+        if self.config.vectorizer_config.word_clusters_name:
             # Extract world clusters on unormalized utterances
             original_utterances_text = [get_text_from_chunks(u[DATA])
                                         for u in utterances]
             w_clusters = [
                 _get_word_cluster_features(
                     tokenize_light(u.lower(), self.language),
-                    self.config.word_clusters_name,
+                    self.config.vectorizer_config.word_clusters_name,
                     self.resources)
                 for u in original_utterances_text
             ]
@@ -761,9 +761,9 @@ class CooccurrenceVectorizer(ProcessingUnit):
 
         Given a list of utterances the CooccurrenceVectorizer will extract word
         pairs appearing in the same utterance. The order in which the words
-        appear is kept. Additionally, if self.config.window_size is not None
+        appear is kept. Additionally, if self.config.cooccurrence_vectorizer_config.window_size is not None
         then the vectorizer will only look in a context window of
-        self.config.window_size after each word.
+        self.config.cooccurrence_vectorizer_config.window_size after each word.
 
         Args:
             x (iterable): list of utterances
@@ -824,10 +824,10 @@ class CooccurrenceVectorizer(ProcessingUnit):
         # Tokenize
         enriched_utterance = tokenize_light(enriched_utterance, self.language)
         # Remove the unknownword strings if needed
-        if self.config.unknown_words_replacement_string:
+        if self.config.cooccurrence_vectorizer_config.unknown_words_replacement_string:
             enriched_utterance = [
                 t for t in enriched_utterance
-                if t != self.config.unknown_words_replacement_string
+                if t != self.config.cooccurrence_vectorizer_config.unknown_words_replacement_string
             ]
         return enriched_utterance
 
@@ -884,17 +884,17 @@ class CooccurrenceVectorizer(ProcessingUnit):
         return x, builtin_ents, custom_ents
 
     def _extract_word_pairs(self, utterance):
-        if self.config.filter_stop_words:
+        if self.config.cooccurrence_vectorizer_config.filter_stop_words:
             stop_words = get_stop_words(self.resources)
             utterance = [t for t in utterance if t not in stop_words]
         pairs = set()
         for j, w1 in enumerate(utterance):
             max_index = None
-            if self.config.window_size is not None:
-                max_index = j + self.config.window_size + 1
+            if self.config.cooccurrence_vectorizer_config.window_size is not None:
+                max_index = j + self.config.cooccurrence_vectorizer_config.window_size + 1
             for w2 in utterance[j + 1:max_index]:
                 key = (w1, w2)
-                if not self.config.keep_order:
+                if not self.config.cooccurrence_vectorizer_config.keep_order:
                     key = tuple(sorted(key))
                 pairs.add(key)
         return pairs
