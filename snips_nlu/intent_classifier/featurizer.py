@@ -489,7 +489,7 @@ class TfidfVectorizer(ProcessingUnit):
         from sklearn.feature_selection import chi2
 
         # Instantiate TF-IDF:
-        self.tfidf_vectorizer = TfidfVectorizer(config=self.config.tfidf_vectorizer_config,
+        self.tfidf_vectorizer = TfidfVectorizer(config=self.config,
                                                 builtin_entity_parser=self.builtin_entity_parser,
                                                 custom_entity_parser=self.custom_entity_parser,
                                                 resources=self.resources,
@@ -499,6 +499,11 @@ class TfidfVectorizer(ProcessingUnit):
         # Fit the IDF:
         x_tfidf = self.tfidf_vectorizer.fit_transform(x, dataset)
 
+        # Fit entity parsers and get resources:
+        self.load_resources_if_needed(dataset[LANGUAGE])
+        self.fit_builtin_entity_parser_if_needed(dataset)
+        self.fit_custom_entity_parser_if_needed(dataset)
+        
         # If list of unique words is empty:
         if not self.tfidf_vectorizer.vocabulary:
             raise _EmptyDatasetUtterancesError("Dataset is empty or with empty utterances")
@@ -524,7 +529,7 @@ class TfidfVectorizer(ProcessingUnit):
         utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
 
         #! Use Sklearn's TF-IDF vectorizer method:
-        return self._tfidf_vectorizer.transform(utterances)
+        return self.tfidf_vectorizer._tfidf_vectorizer.transform(utterances)
 
 
     def _preprocess(self, utterances):
@@ -823,7 +828,7 @@ class CooccurrenceVectorizer(ProcessingUnit):
             utterance, all_entities, placeholder_fn)[1]
         # Tokenize
         enriched_utterance = tokenize_light(enriched_utterance, self.language)
-        # Remove the unknownword strings if needed
+        # Remove the unknown word strings if needed
         if self.config.unknown_words_replacement_string:
             enriched_utterance = [
                 t for t in enriched_utterance
