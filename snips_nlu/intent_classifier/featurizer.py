@@ -148,7 +148,7 @@ class Featurizer(ProcessingUnit):
             random_state=self.random_state,
         )
 
-        # Fit cooccurrence vectorizer based on word-pair occurrence:
+        # Compute Word Pairs and fit cooccurrence vectorizer based on word-pair occurrences:
         x_cooccurrence = self.cooccurrence_vectorizer.fit(non_null_x, dataset).transform(x)
 
         # If there are no word pairs just return the featurizer (nothing to fit):
@@ -157,8 +157,14 @@ class Featurizer(ProcessingUnit):
 
         # Feature selection for coccurrences:
         _, pval = chi2(x_cooccurrence, classes)
+        
+        try:
+            voc = len(self.vectorizer.tfidf_vectorizer.idf_diag)
 
-        top_k = int(self.config.added_cooccurrence_feature_ratio * len(self.vectorizer.idf_diag))
+        except:
+            voc = round(len(self.cooccurrence_vectorizer.word_pairs)/2)
+
+        top_k = int(self.config.added_cooccurrence_feature_ratio * voc)
 
         # No selection if k is greater or equal than the number of word pairs (keep everything)
         if top_k >= len(self.cooccurrence_vectorizer.word_pairs):
@@ -783,18 +789,19 @@ class CooccurrenceVectorizer(ProcessingUnit):
         self.fit_custom_entity_parser_if_needed(dataset)
 
         self._language = dataset[LANGUAGE]
-        self.builtin_entity_scope = set(
-            e for e in dataset[ENTITIES] if is_builtin_entity(e))
+
+        self.builtin_entity_scope = set(e for e in dataset[ENTITIES] if is_builtin_entity(e))
 
         preprocessed = self._preprocess(list(x))
-        utterances = [
-            self._enrich_utterance(utterance, builtin_ents, custom_ent)
-            for utterance, builtin_ents, custom_ent in zip(*preprocessed)]
-        word_pairs = set(
-            p for u in utterances for p in self._extract_word_pairs(u))
-        self._word_pairs = {
-            pair: i for i, pair in enumerate(sorted(word_pairs))
-        }
+
+        utterances = [self._enrich_utterance(utterance, builtin_ents, custom_ent)
+                      for utterance, builtin_ents, custom_ent in zip(*preprocessed)]
+        
+        # Create a set of all word pairs appearing in the utterances:
+        word_pairs = set(p for u in utterances for p in self._extract_word_pairs(u))
+
+        self._word_pairs = {pair: i for i, pair in enumerate(sorted(word_pairs))}
+
         return self
 
     @property
