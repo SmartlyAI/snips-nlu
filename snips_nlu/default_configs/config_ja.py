@@ -144,7 +144,7 @@ CONFIG = {
                     "unit_name": "featurizer",
                     "pvalue_threshold": 0.9,
                     "added_cooccurrence_feature_ratio": 0.0,
-                    "tfidf_vectorizer_config": {
+                    "vectorizer_config": {
                         "unit_name": "tfidf_vectorizer",
                         "use_stemming": False,
                         "word_clusters_name": "w2v_clusters"

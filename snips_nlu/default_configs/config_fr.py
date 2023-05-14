@@ -117,7 +117,7 @@ CONFIG = {
                     "unit_name": "featurizer",
                     "pvalue_threshold": 0.4,
                     "added_cooccurrence_feature_ratio": 0.0,
-                    "tfidf_vectorizer_config": {
+                    "vectorizer_config": {
                         "unit_name": "tfidf_vectorizer",
                         "use_stemming": True,
                         "word_clusters_name": None

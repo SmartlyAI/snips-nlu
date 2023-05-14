@@ -90,12 +90,11 @@ class LogRegIntentClassifier(IntentClassifier):
             return self
 
         # Instantiate featurizer (includes TF-IDF and Cooccurrence):
-        self.featurizer = Featurizer(
-            config=self.config.featurizer_config,
-            builtin_entity_parser=self.builtin_entity_parser,
-            custom_entity_parser=self.custom_entity_parser,
-            resources=self.resources,
-            random_state=self.random_state,
+        self.featurizer = Featurizer(config=self.config.featurizer_config,
+                                    builtin_entity_parser=self.builtin_entity_parser,
+                                    custom_entity_parser=self.custom_entity_parser,
+                                    resources=self.resources,
+                                    random_state=self.random_state,
         )
 
         # Featurizer's language:
