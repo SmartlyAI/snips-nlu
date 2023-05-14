@@ -474,7 +474,7 @@ class TfidfVectorizer(ProcessingUnit):
     def fitted(self):
         return self._tfidf_vectorizer is not None and hasattr(self._tfidf_vectorizer, "vocabulary_")
 
-    @fitted_required
+    #@fitted_required
     def transform(self, x, y, dataset):
         """Featurizes the given utterances after enriching them with builtin
         entities matches, custom entities matches and the potential word
