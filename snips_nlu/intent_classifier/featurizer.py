@@ -84,7 +84,7 @@ class Featurizer(ProcessingUnit):
             raise _EmptyDatasetUtterancesError("Tokenized utterances are empty")
 
         # Fit TF-IDF vectorizer AND does khi-2 feature selection => returns sparse matrix of columns: significant words, rows: all utterances
-        x_vectorized = self._fit_transform_vectorizer(utterances, classes, dataset, vectorizer_name="fasttext")
+        x_vectorized = self._fit_transform_vectorizer(utterances, classes, dataset, vectorizer_name = self.config.vectorizer_config.unit_name)
 
         # X: explanatory variables/input:
         x = x_vectorized
@@ -994,10 +994,10 @@ class CooccurrenceVectorizer(ProcessingUnit):
 
 def VectorizerFactory(vectorizer_name, featurizer_config):
 
-    if vectorizer_name == 'tfidf':
+    if vectorizer_name == 'tfidf_vectorizer':
         return TfidfVectorizer(featurizer_config)
     
-    elif vectorizer_name == 'fasttext':
+    elif vectorizer_name == 'fasttext_vectorizer':
         return FastTextVectorizer(featurizer_config)
 
 def _entity_name_to_feature(entity_name, language):
