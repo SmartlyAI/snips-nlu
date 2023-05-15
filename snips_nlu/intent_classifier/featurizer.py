@@ -131,7 +131,7 @@ class Featurizer(ProcessingUnit):
 
         #! In reality, the sparse result returned is given independantly by the following ".transform(x)"
         #! the ".fit_transform(x,dataset)" above is only used to select the best n-grams
-        return self.vectorizer.transform(x, y, dataset)
+        return self.vectorizer.transform(x, y=y, dataset=dataset)
     
 
     def _fit_cooccurrence_vectorizer(self, x, classes, none_class, dataset):
@@ -235,7 +235,7 @@ class Featurizer(ProcessingUnit):
         vectorizer_name = featurizer_dict['config']['vectorizer_config']['unit_name']
 
         # Load vectorizer:
-        featurizer.vectorizer = cls.load_vectorizer(vectorizer_name, path, featurizer_dict, **shared)
+        featurizer.vectorizer = cls.load_vectorizer(vectorizer_name, path, featurizer_dict, shared)
         
         # Load cooccurrence vectorizer:
         cooccurrence_vectorizer = featurizer_dict["cooccurrence_vectorizer"]
@@ -249,7 +249,7 @@ class Featurizer(ProcessingUnit):
         return featurizer
     
     @classmethod
-    def load_vectorizer(vectorizer_name, path, featurizer_dict, **shared):
+    def load_vectorizer(vectorizer_name, path, featurizer_dict, shared):
 
         # TF-IDF:
         if vectorizer_name == "tfidf_vectorizer":
@@ -259,7 +259,7 @@ class Featurizer(ProcessingUnit):
         
         # FastText:
         elif vectorizer_name == "fasttext_vectorizer":
-            FastTextVectorizer.from_path()
+            return FastTextVectorizer.from_path()
         
         # Raise error if unknown vectorizer:
         else:
@@ -279,8 +279,8 @@ class FastTextVectorizer(ProcessingUnit):
 
     # Simply calls "fit_transform" (to stay consistent with the "Featurizer" API)
     # We don't need "y" for the FastText vectorizer but we keep it for consistency:
-    def transform(self, x, y, dataset):
-        return self.fit_transform(x, dataset)
+    def transform(self, x, y = None, dataset=None):
+        return self.fit_transform(x, dataset=None)
     
     # Fit the FastText vectorizer:
     def fit_transform(self, x, dataset):
@@ -381,7 +381,8 @@ class FastTextVectorizer(ProcessingUnit):
 
         return features
 
-    def from_path(self, path=None, **shared):
+    @classmethod
+    def from_path(cls, path=None, **shared):
         import compress_fasttext
         return compress_fasttext.models.CompressedFastTextKeyedVectors.load('./resources/embeddings/cc.fr.300-quantized')
 
