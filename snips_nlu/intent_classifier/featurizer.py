@@ -249,7 +249,7 @@ class Featurizer(ProcessingUnit):
         return featurizer
     
     @classmethod
-    def load_vectorizer(vectorizer_name, path, featurizer_dict, shared):
+    def load_vectorizer(cls, vectorizer_name, path, featurizer_dict, shared):
 
         # TF-IDF:
         if vectorizer_name == "tfidf_vectorizer":
