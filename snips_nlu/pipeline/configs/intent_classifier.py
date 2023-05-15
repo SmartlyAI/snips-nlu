@@ -221,7 +221,7 @@ class FeaturizerConfig(FromDict, ProcessingUnitConfig):
 class VectorizerConfig(FromDict, ProcessingUnitConfig):
     """Configuration of a :class:`.TfidfVectorizerConfig` object"""
 
-    def __init__(self, word_clusters_name=None, use_stemming=False):
+    def __init__(self, word_clusters_name=None, use_stemming=False, unit_name=None):
         """
         Args:
             word_clusters_name (str, optional): if a word cluster name is
@@ -233,11 +233,11 @@ class VectorizerConfig(FromDict, ProcessingUnitConfig):
         """
         self.word_clusters_name = word_clusters_name
         self.use_stemming = use_stemming
+        self.unit_name = unit_name
 
-    @property
+    #@property
     def unit_name(self):
-        from snips_nlu.intent_classifier import TfidfVectorizer
-        return TfidfVectorizer.unit_name
+        pass
 
     def get_required_resources(self):
         resources = {STEMS: True if self.use_stemming else False}
