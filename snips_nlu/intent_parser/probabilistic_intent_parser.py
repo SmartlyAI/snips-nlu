@@ -46,8 +46,7 @@ class ProbabilisticIntentParser(IntentParser):
                and all(slot_filler is not None and slot_filler.fitted
                        for slot_filler in itervalues(self.slot_fillers))
 
-    @log_elapsed_time(logger, logging.INFO,
-                      "Fitted probabilistic intent parser in {elapsed_time}")
+    @log_elapsed_time(logger, logging.INFO, "Fitted probabilistic intent parser in {elapsed_time}")
     # pylint:disable=arguments-differ
     def fit(self, dataset, force_retrain=True):
         """Fits the probabilistic intent parser

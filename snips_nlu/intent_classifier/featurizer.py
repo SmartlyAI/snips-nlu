@@ -231,14 +231,13 @@ class Featurizer(ProcessingUnit):
 
         featurizer.language = featurizer_dict["language_code"]
 
-        tfidf_vectorizer = featurizer_dict["tfidf_vectorizer"]
+        #! TF-IDF, FastText, etc.
+        vectorizer_name = featurizer_dict['config']['vectorizer_config']['unit_name']
+
+        # Load vectorizer:
+        featurizer.vectorizer = cls.load_vectorizer(vectorizer_name, path, featurizer_dict, **shared)
         
-        if tfidf_vectorizer:
-            vectorizer_path = path / featurizer_dict["tfidf_vectorizer"]
-            tfidf_vectorizer = TfidfVectorizer.from_path(vectorizer_path, **shared)
-
-        featurizer.vectorizer = tfidf_vectorizer
-
+        # Load cooccurrence vectorizer:
         cooccurrence_vectorizer = featurizer_dict["cooccurrence_vectorizer"]
 
         if cooccurrence_vectorizer:
@@ -248,6 +247,23 @@ class Featurizer(ProcessingUnit):
         featurizer.cooccurrence_vectorizer = cooccurrence_vectorizer
 
         return featurizer
+    
+    @classmethod
+    def load_vectorizer(vectorizer_name, path, featurizer_dict, **shared):
+
+        # TF-IDF:
+        if vectorizer_name == "tfidf_vectorizer":
+            vectorizer_path = path / featurizer_dict["tfidf_vectorizer"]
+            tfidf_vectorizer = TfidfVectorizer.from_path(vectorizer_path, **shared)
+            return tfidf_vectorizer
+        
+        # FastText:
+        elif vectorizer_name == "fasttext_vectorizer":
+            FastTextVectorizer.from_path()
+        
+        # Raise error if unknown vectorizer:
+        else:
+            raise ValueError("Unknown vectorizer: %s" % vectorizer_name)
 
 
 @ProcessingUnit.register("fasttext_vectorizer")

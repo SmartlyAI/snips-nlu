@@ -403,14 +403,16 @@ class SnipsNLUEngine(ProcessingUnit):
                     parser_path)
 
         config = cls.config_type.from_dict(model["config"])
+
         nlu_engine = cls(config=config, **shared)
+
         nlu_engine.dataset_metadata = dataset_metadata
+
         intent_parsers = []
         for parser_idx, parser_name in enumerate(model["intent_parsers"]):
             parser_config = config.intent_parsers_configs[parser_idx]
             intent_parser_path = directory_path / parser_name
-            intent_parser = IntentParser.load_from_path(
-                intent_parser_path, parser_config.unit_name, **shared)
+            intent_parser = IntentParser.load_from_path(intent_parser_path, parser_config.unit_name, **shared)
             intent_parsers.append(intent_parser)
         nlu_engine.intent_parsers = intent_parsers
         return nlu_engine
