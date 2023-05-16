@@ -279,8 +279,8 @@ class FastTextVectorizer(ProcessingUnit):
 
     # Simply calls "fit_transform" (to stay consistent with the "Featurizer" API)
     # We don't need "y" for the FastText vectorizer but we keep it for consistency:
-    def transform(self, x, y = None, dataset=None):
-        return self.fit_transform(x, dataset=None)
+    def transform(self, x, y=None, dataset=None):
+        return self.fit_transform(x, dataset=dataset)
     
     # Fit the FastText vectorizer:
     def fit_transform(self, x, dataset):
