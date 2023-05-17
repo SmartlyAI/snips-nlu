@@ -261,7 +261,7 @@ class Featurizer(ProcessingUnit):
         
         # FastText:
         elif vectorizer_name == "fasttext_vectorizer":
-            return FastTextVectorizer.from_path()
+            return FastTextVectorizer()
         
         # Raise error if unknown vectorizer:
         else:
@@ -656,7 +656,7 @@ class FastTextVectorizer(ProcessingUnit):
 
     
     # Fit the FastText vectorizer:
-    def fit_transform(self, x, dataset):
+    def fit_transform(self, x, y, dataset):
 
         # Instantiate TF-IDF:
         self.fasttext_vectorizer = FastTextVectorizer(config=self.config,
