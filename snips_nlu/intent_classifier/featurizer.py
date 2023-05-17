@@ -131,7 +131,9 @@ class Featurizer(ProcessingUnit):
 
         #! In reality, the sparse result returned is given independantly by the following ".transform(x)"
         #! the ".fit_transform(x,dataset)" above is only used to select the best n-grams
-        return self.vectorizer.transform(x, y=y, dataset=dataset)
+
+        # TODO replace transform() with fit_transform()
+        return self.vectorizer.fit_transform(x, y, dataset)
     
 
     def _fit_cooccurrence_vectorizer(self, x, classes, none_class, dataset):
@@ -265,6 +267,370 @@ class Featurizer(ProcessingUnit):
         else:
             raise ValueError("Unknown vectorizer: %s" % vectorizer_name)
 
+    
+
+@ProcessingUnit.register("tfidf_vectorizer")
+class TfidfVectorizer(ProcessingUnit):
+    """Wrapper of the scikit-learn TfidfVectorizer"""
+
+    config_type = VectorizerConfig
+
+    def __init__(self, config=None, **shared):
+        super(TfidfVectorizer, self).__init__(config, **shared)
+        self._sklearn_tfidf_vectorizer = None
+        self._language = None
+        self.builtin_entity_scope = None
+
+    # Fit the "IDF" part of the vectorizer:
+    def fit(self, x, dataset):
+        """Fits the idf of the vectorizer on the given utterances after
+        enriching them with builtin entities matches, custom entities matches
+        and the potential word clusters matches
+
+        Args:
+            x (list of dict): list of utterances
+            dataset (dict): dataset from which x was extracted (needed to
+                extract the language and the builtin entity scope)
+
+        Returns:
+            :class:`.TfidfVectorizer`: The fitted vectorizer
+        """
+        self.load_resources_if_needed(dataset[LANGUAGE])
+        self.fit_builtin_entity_parser_if_needed(dataset)
+        self.fit_custom_entity_parser_if_needed(dataset)
+
+        self._language = dataset[LANGUAGE]
+
+        # Initialize Sklearn vectorizer and define the tokenizer within it:
+        self._init_sklearn_vectorizer(self._language)
+        self.builtin_entity_scope = set(
+            e for e in dataset[ENTITIES] if is_builtin_entity(e))
+        preprocessed_data = self._preprocess(x)
+        utterances = [
+            self._enrich_utterance(u, builtin_ents, custom_ents, w_clusters)
+            for u, builtin_ents, custom_ents, w_clusters
+            in zip(*preprocessed_data)
+        ]
+        return self._sklearn_tfidf_vectorizer.fit(utterances)
+
+    #! Fit the IDF part and add entities:
+    # TODO: rename this to transform and remove "dataset" argument
+    def transform(self, x):
+        """Fits the idf of the vectorizer on the given utterances after
+        enriching them with builtin entities matches, custom entities matches
+        and the potential word clusters matches.
+        Returns the featurized utterances.
+
+        Args:
+            x (list of dict): list of utterances
+            dataset (dict): dataset from which x was extracted (needed to
+                extract the language and the builtin entity scope)
+
+        Returns:
+            :class:`.scipy.sparse.csr_matrix`: A sparse matrix X of shape
+            (len(x), len(self.vocabulary)) where X[i, j] contains tfdif of
+            the ngram of index j of the vocabulary in the utterance i
+        """
+
+        # Formatted data: tuple of => utterances, system entities, custom entities and word clusters
+        preprocessed_data = self._preprocess(x)
+
+        # List of utterances => with some entities-related processing:
+        utterances = [
+            self._enrich_utterance(u, builtin_ents, custom_ents, w_clusters)
+            for u, builtin_ents, custom_ents, w_clusters
+            in zip(*preprocessed_data)
+        ]
+
+        #! Calls the fit_transform() method of the Sklearn vectorizer:
+        # Return TF-IDF sparse CSR matrix => rows are documents (i.e. utterances) and columns are *unique* words (i.e. vocabulary):
+        # TODO: replace fit_transform with transform()
+        return self._sklearn_tfidf_vectorizer.transform(utterances)
+
+    @property
+    def fitted(self):
+        return self._sklearn_tfidf_vectorizer is not None and hasattr(self._sklearn_tfidf_vectorizer, "vocabulary_")
+
+    #@fitted_required
+    # TODO: rename this to "fit_transform" but keep same arguments
+    def fit_transform(self, x, y, dataset):
+        """Featurizes the given utterances after enriching them with builtin
+        entities matches, custom entities matches and the potential word
+        clusters matches
+
+        Args:
+            x (list of dict): list of utterances
+
+        Returns:
+            :class:`.scipy.sparse.csr_matrix`: A sparse matrix X of shape
+            (len(x), len(self.vocabulary)) where X[i, j] contains tfdif of
+            the ngram of index j of the vocabulary in the utterance i
+
+        Raises:
+            NotTrained: when the vectorizer is not fitted:
+        """
+
+        from sklearn.feature_selection import chi2
+
+        # Instantiate TF-IDF:
+        self.tfidf_vectorizer = TfidfVectorizer(config=self.config,
+                                                builtin_entity_parser=self.builtin_entity_parser,
+                                                custom_entity_parser=self.custom_entity_parser,
+                                                resources=self.resources,
+                                                random_state=self.random_state,
+                                                )
+        
+        # Fit slot parsers and get resources if needed:
+        self.load_resources_if_needed(dataset[LANGUAGE])
+        self.fit_builtin_entity_parser_if_needed(dataset)
+        self.fit_custom_entity_parser_if_needed(dataset)
+
+        # Get language:
+        self._language = dataset[LANGUAGE]
+
+        # Initialize Sklearn TF-IDF and define the tokenizer within it:
+        self._init_sklearn_vectorizer(self._language)
+
+        # Set builtin entity scope (used in "_preprocess()" method):
+        self.builtin_entity_scope = set(e for e in dataset[ENTITIES] if is_builtin_entity(e))
+
+        # Fit the IDF:
+        # TODO: use sklearn's fit_transform() here:
+        x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(x, dataset)
+
+        # If list of unique words is empty:
+        if not self.tfidf_vectorizer.vocabulary:
+            raise _EmptyDatasetUtterancesError("Dataset is empty or with empty utterances")
+
+        # Khi-2 feature selection:
+        _, tfidf_pval = chi2(x_tfidf, y)
+
+        # Set of features that fall below p-value:
+        best_tfidf_features = set(i for i, v in enumerate(tfidf_pval) if v < self.config.pvalue_threshold)
+
+        # If no features are significant:
+        if not best_tfidf_features:
+            best_tfidf_features = set(idx for idx, val in enumerate(tfidf_pval) if val == tfidf_pval.min())
+
+        # Get the ngrams corresponding to the best (i.e. significant) features:
+        best_ngrams = [ng for ng, i in iteritems(self.tfidf_vectorizer.vocabulary) if i in best_tfidf_features]
+
+        # Only keep the significant columns (i.e. features/words):
+        #! result is set in the class attribute "self._tfidf_vectorizer.vocabulary_"
+        self.tfidf_vectorizer.limit_vocabulary(best_ngrams)
+
+        #! Transform the utterances into a TF-IDF matrix:
+        utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
+
+        #! Use Sklearn's TF-IDF vectorizer method:
+        return self.tfidf_vectorizer._sklearn_tfidf_vectorizer.transform(utterances)
+
+
+    def _preprocess(self, utterances):
+        normalized_utterances = deepcopy(utterances)
+        for u in normalized_utterances:
+            nb_chunks = len(u[DATA])
+            for i, chunk in enumerate(u[DATA]):
+                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, self.config.vectorizer_config.use_stemming)
+                if i < nb_chunks - 1:
+                    chunk[TEXT] += " "
+
+        # Extract builtin entities on unormalized utterances
+        builtin_ents = [
+            self.builtin_entity_parser.parse(
+                get_text_from_chunks(u[DATA]),
+                self.builtin_entity_scope, use_cache=True)
+            for u in utterances
+        ]
+        # Extract builtin entities on normalized utterances
+        custom_ents = [
+            self.custom_entity_parser.parse(
+                get_text_from_chunks(u[DATA]), use_cache=True)
+            for u in normalized_utterances
+        ]
+        if self.config.vectorizer_config.word_clusters_name:
+            # Extract world clusters on unormalized utterances
+            original_utterances_text = [get_text_from_chunks(u[DATA])
+                                        for u in utterances]
+            w_clusters = [
+                _get_word_cluster_features(
+                    tokenize_light(u.lower(), self.language),
+                    self.config.vectorizer_config.word_clusters_name,
+                    self.resources)
+                for u in original_utterances_text
+            ]
+        else:
+            w_clusters = [None for _ in normalized_utterances]
+
+        return normalized_utterances, builtin_ents, custom_ents, w_clusters
+
+
+    # Enriches the utterance with builtin entities, custom entities and word clusters:
+    def _enrich_utterance(self, utterance, builtin_entities, custom_entities,word_clusters):
+        
+        custom_entities_features = [_entity_name_to_feature(e[ENTITY_KIND], self.language) for e in custom_entities]
+
+        builtin_entities_features = [_builtin_entity_to_feature(ent[ENTITY_KIND], self.language) for ent in builtin_entities]
+
+        # We remove values of builtin slots from the utterance to avoid
+        # learning specific samples such as '42' or 'tomorrow'
+        filtered_tokens = [
+            chunk[TEXT] for chunk in utterance[DATA]
+            if ENTITY not in chunk or not is_builtin_entity(chunk[ENTITY])
+        ]
+
+        features = get_default_sep(self.language).join(filtered_tokens)
+
+        if builtin_entities_features:
+            features += " " + " ".join(sorted(builtin_entities_features))
+        if custom_entities_features:
+            features += " " + " ".join(sorted(custom_entities_features))
+        if word_clusters:
+            features += " " + " ".join(sorted(word_clusters))
+
+        return features
+
+    @property
+    def language(self):
+        # Create this getter to prevent the language from being set elsewhere
+        # than in the fit
+        return self._language
+
+    @property
+    def vocabulary(self):
+        if self._sklearn_tfidf_vectorizer and hasattr(
+                self._sklearn_tfidf_vectorizer, "vocabulary_"):
+            return self._sklearn_tfidf_vectorizer.vocabulary_
+        return None
+
+    @fitted_required
+    def limit_vocabulary(self, ngrams):
+        """Restrict the vectorizer vocabulary to the given ngrams
+
+        Args:
+            ngrams (iterable of str or tuples of str): ngrams to keep
+
+        Returns:
+            :class:`.TfidfVectorizer`: The vectorizer with limited vocabulary
+        """
+        import scipy.sparse as sp
+
+        ngrams = set(ngrams)
+        vocab = self.vocabulary
+        existing_ngrams = set(vocab)
+        extra_values = ngrams - existing_ngrams
+
+        if extra_values:
+            raise ValueError("Invalid ngrams %s, expected values in word_pairs" % sorted(extra_values))
+
+        new_ngrams, new_index = zip(*sorted((ng, vocab[ng]) for ng in ngrams))
+
+        self._sklearn_tfidf_vectorizer.vocabulary_ = {
+            ng: new_i for new_i, ng in enumerate(new_ngrams)
+        }
+        # pylint: disable=protected-access
+        # The new_idf_data is valid because the previous _idf_diag was indexed
+        # with sorted ngrams and new_index is also indexed with sorted ngrams
+
+        new_idf_data = self._sklearn_tfidf_vectorizer._tfidf._idf_diag.data[list(new_index)]
+
+        self._sklearn_tfidf_vectorizer._tfidf._idf_diag = sp.spdiags(new_idf_data, diags=0, m=len(new_index), n=len(new_index), format="csr")
+        # pylint: enable=protected-access
+
+        #! This return is redundant => the returned value is
+        #! not used because the result is set as an attribute
+        return self
+
+    @property
+    def idf_diag(self):
+        if self._sklearn_tfidf_vectorizer and hasattr(self._sklearn_tfidf_vectorizer, "vocabulary_"):
+            return self._sklearn_tfidf_vectorizer.idf_
+        return None
+
+    def _init_sklearn_vectorizer(self, language):
+        from sklearn.feature_extraction.text import (TfidfVectorizer as SklearnTfidfVectorizer)
+
+        self._sklearn_tfidf_vectorizer = SklearnTfidfVectorizer(tokenizer=lambda x: tokenize_light(x, language))
+        return self
+
+    @check_persisted_path
+    def persist(self, path):
+        path.mkdir()
+
+        vectorizer_ = None
+        if self._sklearn_tfidf_vectorizer is not None:
+            vocab = {k: int(v) for k, v in iteritems(self.vocabulary)}
+            idf_diag = self.idf_diag.tolist()
+            vectorizer_ = {
+                "vocab": vocab,
+                "idf_diag": idf_diag
+            }
+
+        builtin_entity_scope = None
+        if self.builtin_entity_scope is not None:
+            builtin_entity_scope = list(self.builtin_entity_scope)
+
+        self_as_dict = {
+            "vectorizer": vectorizer_,
+            "language_code": self.language,
+            "builtin_entity_scope": builtin_entity_scope,
+            "config": self.config.to_dict(),
+        }
+
+        vectorizer_path = path / "vectorizer.json"
+        with vectorizer_path.open("w", encoding="utf-8") as f:
+            f.write(json_string(self_as_dict))
+        self.persist_metadata(path)
+
+    @classmethod
+    # pylint: disable=W0212
+    def from_path(cls, path, **shared):
+        import numpy as np
+        import scipy.sparse as sp
+        from sklearn.feature_extraction.text import (
+            TfidfTransformer, TfidfVectorizer as SklearnTfidfVectorizer)
+
+        path = Path(path)
+
+        model_path = path / "vectorizer.json"
+        if not model_path.exists():
+            raise LoadingError("Missing vectorizer model file: %s"
+                               % model_path.name)
+        with model_path.open("r", encoding="utf-8") as f:
+            vectorizer_dict = json.load(f)
+
+        vectorizer = cls(vectorizer_dict["config"], **shared)
+        vectorizer._language = vectorizer_dict["language_code"]
+
+        builtin_entity_scope = vectorizer_dict["builtin_entity_scope"]
+        if builtin_entity_scope is not None:
+            builtin_entity_scope = set(builtin_entity_scope)
+        vectorizer.builtin_entity_scope = builtin_entity_scope
+
+        vectorizer_ = vectorizer_dict["vectorizer"]
+        if vectorizer_:
+            vocab = vectorizer_["vocab"]
+            idf_diag_data = vectorizer_["idf_diag"]
+            idf_diag_data = np.array(idf_diag_data)
+
+            idf_diag_shape = (len(idf_diag_data), len(idf_diag_data))
+            row = list(range(idf_diag_shape[0]))
+            col = list(range(idf_diag_shape[0]))
+            idf_diag = sp.csr_matrix(
+                (idf_diag_data, (row, col)), shape=idf_diag_shape)
+
+            tfidf_transformer = TfidfTransformer()
+            tfidf_transformer._idf_diag = idf_diag
+
+            vectorizer_ = SklearnTfidfVectorizer(
+                tokenizer=lambda x: tokenize_light(x, vectorizer._language))
+            vectorizer_.vocabulary_ = vocab
+
+            vectorizer_._tfidf = tfidf_transformer
+
+        vectorizer._sklearn_tfidf_vectorizer = vectorizer_
+        return vectorizer
+
 
 @ProcessingUnit.register("fasttext_vectorizer")
 class FastTextVectorizer(ProcessingUnit):
@@ -279,8 +645,15 @@ class FastTextVectorizer(ProcessingUnit):
 
     # Simply calls "fit_transform" (to stay consistent with the "Featurizer" API)
     # We don't need "y" for the FastText vectorizer but we keep it for consistency:
-    def transform(self, x, y=None, dataset=None):
-        return self.fit_transform(x, dataset=dataset)
+    def transform(self, x):
+
+        raw_utterance = x[0]['data'][0]['text'].strip()
+        fast_model = self.from_path()
+        x_fasttext = fast_model[raw_utterance]
+        x_csr = sparse.csr_matrix(x_fasttext)
+
+        return x_csr
+
     
     # Fit the FastText vectorizer:
     def fit_transform(self, x, dataset):
@@ -400,366 +773,6 @@ class FastTextVectorizer(ProcessingUnit):
         # Create this getter to prevent the language from being set elsewhere than in the fit
         return self._language
     
-
-@ProcessingUnit.register("tfidf_vectorizer")
-class TfidfVectorizer(ProcessingUnit):
-    """Wrapper of the scikit-learn TfidfVectorizer"""
-
-    config_type = VectorizerConfig
-
-    def __init__(self, config=None, **shared):
-        super(TfidfVectorizer, self).__init__(config, **shared)
-        self._tfidf_vectorizer = None
-        self._language = None
-        self.builtin_entity_scope = None
-
-    # Fit the "IDF" part of the vectorizer:
-    def fit(self, x, dataset):
-        """Fits the idf of the vectorizer on the given utterances after
-        enriching them with builtin entities matches, custom entities matches
-        and the potential word clusters matches
-
-        Args:
-            x (list of dict): list of utterances
-            dataset (dict): dataset from which x was extracted (needed to
-                extract the language and the builtin entity scope)
-
-        Returns:
-            :class:`.TfidfVectorizer`: The fitted vectorizer
-        """
-        self.load_resources_if_needed(dataset[LANGUAGE])
-        self.fit_builtin_entity_parser_if_needed(dataset)
-        self.fit_custom_entity_parser_if_needed(dataset)
-
-        self._language = dataset[LANGUAGE]
-
-        # Initialize Sklearn vectorizer and define the tokenizer within it:
-        self._init_vectorizer(self._language)
-        self.builtin_entity_scope = set(
-            e for e in dataset[ENTITIES] if is_builtin_entity(e))
-        preprocessed_data = self._preprocess(x)
-        utterances = [
-            self._enrich_utterance(u, builtin_ents, custom_ents, w_clusters)
-            for u, builtin_ents, custom_ents, w_clusters
-            in zip(*preprocessed_data)
-        ]
-        return self._tfidf_vectorizer.fit(utterances)
-
-    #! Fit the IDF part and add entities:
-    def fit_transform(self, x, dataset):
-        """Fits the idf of the vectorizer on the given utterances after
-        enriching them with builtin entities matches, custom entities matches
-        and the potential word clusters matches.
-        Returns the featurized utterances.
-
-        Args:
-            x (list of dict): list of utterances
-            dataset (dict): dataset from which x was extracted (needed to
-                extract the language and the builtin entity scope)
-
-        Returns:
-            :class:`.scipy.sparse.csr_matrix`: A sparse matrix X of shape
-            (len(x), len(self.vocabulary)) where X[i, j] contains tfdif of
-            the ngram of index j of the vocabulary in the utterance i
-        """
-        self.load_resources_if_needed(dataset[LANGUAGE])
-        self.fit_builtin_entity_parser_if_needed(dataset)
-        self.fit_custom_entity_parser_if_needed(dataset)
-
-        self._language = dataset[LANGUAGE]
-
-        # Initialize Sklearn vectorizer and define the tokenizer within it:
-        self._init_vectorizer(self._language)
-
-        self.builtin_entity_scope = set(e for e in dataset[ENTITIES] if is_builtin_entity(e))
-
-        # Formatted data: tuple of => utterances, system entities, custom entities and word clusters
-        preprocessed_data = self._preprocess(x)
-
-        # List of utterances => with some entities-related processing:
-        utterances = [
-            self._enrich_utterance(u, builtin_ents, custom_ents, w_clusters)
-            for u, builtin_ents, custom_ents, w_clusters
-            in zip(*preprocessed_data)
-        ]
-
-        #! Calls the fit_transform() method of the Sklearn vectorizer:
-        # Return TF-IDF sparse CSR matrix => rows are documents (i.e. utterances) and columns are *unique* words (i.e. vocabulary):
-        return self._tfidf_vectorizer.fit_transform(utterances)
-
-    @property
-    def fitted(self):
-        return self._tfidf_vectorizer is not None and hasattr(self._tfidf_vectorizer, "vocabulary_")
-
-    #@fitted_required
-    def transform(self, x, y, dataset):
-        """Featurizes the given utterances after enriching them with builtin
-        entities matches, custom entities matches and the potential word
-        clusters matches
-
-        Args:
-            x (list of dict): list of utterances
-
-        Returns:
-            :class:`.scipy.sparse.csr_matrix`: A sparse matrix X of shape
-            (len(x), len(self.vocabulary)) where X[i, j] contains tfdif of
-            the ngram of index j of the vocabulary in the utterance i
-
-        Raises:
-            NotTrained: when the vectorizer is not fitted:
-        """
-
-        from sklearn.feature_selection import chi2
-
-        # Instantiate TF-IDF:
-        self.tfidf_vectorizer = TfidfVectorizer(config=self.config,
-                                                builtin_entity_parser=self.builtin_entity_parser,
-                                                custom_entity_parser=self.custom_entity_parser,
-                                                resources=self.resources,
-                                                random_state=self.random_state,
-                                                )
-        
-        # Fit the IDF:
-        x_tfidf = self.tfidf_vectorizer.fit_transform(x, dataset)
-
-        # Fit entity parsers and get resources:
-        self.load_resources_if_needed(dataset[LANGUAGE])
-        self.fit_builtin_entity_parser_if_needed(dataset)
-        self.fit_custom_entity_parser_if_needed(dataset)
-        
-        # If list of unique words is empty:
-        if not self.tfidf_vectorizer.vocabulary:
-            raise _EmptyDatasetUtterancesError("Dataset is empty or with empty utterances")
-
-        # Khi-2 feature selection:
-        _, tfidf_pval = chi2(x_tfidf, y)
-
-        # Set of features that fall below p-value:
-        best_tfidf_features = set(i for i, v in enumerate(tfidf_pval) if v < self.config.pvalue_threshold)
-
-        # If no features are significant:
-        if not best_tfidf_features:
-            best_tfidf_features = set(idx for idx, val in enumerate(tfidf_pval) if val == tfidf_pval.min())
-
-        # Get the ngrams corresponding to the best (i.e. significant) features:
-        best_ngrams = [ng for ng, i in iteritems(self.tfidf_vectorizer.vocabulary) if i in best_tfidf_features]
-
-        # Only keep the significant columns (i.e. features/words):
-        #! result is set in the class attribute "self._tfidf_vectorizer.vocabulary_"
-        self.tfidf_vectorizer.limit_vocabulary(best_ngrams)
-
-        #! Transform the utterances into a TF-IDF matrix:
-        utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
-
-        #! Use Sklearn's TF-IDF vectorizer method:
-        return self.tfidf_vectorizer._tfidf_vectorizer.transform(utterances)
-
-
-    def _preprocess(self, utterances):
-        normalized_utterances = deepcopy(utterances)
-        for u in normalized_utterances:
-            nb_chunks = len(u[DATA])
-            for i, chunk in enumerate(u[DATA]):
-                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, self.config.vectorizer_config.use_stemming)
-                if i < nb_chunks - 1:
-                    chunk[TEXT] += " "
-
-        # Extract builtin entities on unormalized utterances
-        builtin_ents = [
-            self.builtin_entity_parser.parse(
-                get_text_from_chunks(u[DATA]),
-                self.builtin_entity_scope, use_cache=True)
-            for u in utterances
-        ]
-        # Extract builtin entities on normalized utterances
-        custom_ents = [
-            self.custom_entity_parser.parse(
-                get_text_from_chunks(u[DATA]), use_cache=True)
-            for u in normalized_utterances
-        ]
-        if self.config.vectorizer_config.word_clusters_name:
-            # Extract world clusters on unormalized utterances
-            original_utterances_text = [get_text_from_chunks(u[DATA])
-                                        for u in utterances]
-            w_clusters = [
-                _get_word_cluster_features(
-                    tokenize_light(u.lower(), self.language),
-                    self.config.vectorizer_config.word_clusters_name,
-                    self.resources)
-                for u in original_utterances_text
-            ]
-        else:
-            w_clusters = [None for _ in normalized_utterances]
-
-        return normalized_utterances, builtin_ents, custom_ents, w_clusters
-
-
-    # Enriches the utterance with builtin entities, custom entities and word clusters:
-    def _enrich_utterance(self, utterance, builtin_entities, custom_entities,word_clusters):
-        
-        custom_entities_features = [_entity_name_to_feature(e[ENTITY_KIND], self.language) for e in custom_entities]
-
-        builtin_entities_features = [_builtin_entity_to_feature(ent[ENTITY_KIND], self.language) for ent in builtin_entities]
-
-        # We remove values of builtin slots from the utterance to avoid
-        # learning specific samples such as '42' or 'tomorrow'
-        filtered_tokens = [
-            chunk[TEXT] for chunk in utterance[DATA]
-            if ENTITY not in chunk or not is_builtin_entity(chunk[ENTITY])
-        ]
-
-        features = get_default_sep(self.language).join(filtered_tokens)
-
-        if builtin_entities_features:
-            features += " " + " ".join(sorted(builtin_entities_features))
-        if custom_entities_features:
-            features += " " + " ".join(sorted(custom_entities_features))
-        if word_clusters:
-            features += " " + " ".join(sorted(word_clusters))
-
-        return features
-
-    @property
-    def language(self):
-        # Create this getter to prevent the language from being set elsewhere
-        # than in the fit
-        return self._language
-
-    @property
-    def vocabulary(self):
-        if self._tfidf_vectorizer and hasattr(
-                self._tfidf_vectorizer, "vocabulary_"):
-            return self._tfidf_vectorizer.vocabulary_
-        return None
-
-    @fitted_required
-    def limit_vocabulary(self, ngrams):
-        """Restrict the vectorizer vocabulary to the given ngrams
-
-        Args:
-            ngrams (iterable of str or tuples of str): ngrams to keep
-
-        Returns:
-            :class:`.TfidfVectorizer`: The vectorizer with limited vocabulary
-        """
-        import scipy.sparse as sp
-
-        ngrams = set(ngrams)
-        vocab = self.vocabulary
-        existing_ngrams = set(vocab)
-        extra_values = ngrams - existing_ngrams
-
-        if extra_values:
-            raise ValueError("Invalid ngrams %s, expected values in word_pairs" % sorted(extra_values))
-
-        new_ngrams, new_index = zip(*sorted((ng, vocab[ng]) for ng in ngrams))
-
-        self._tfidf_vectorizer.vocabulary_ = {
-            ng: new_i for new_i, ng in enumerate(new_ngrams)
-        }
-        # pylint: disable=protected-access
-        # The new_idf_data is valid because the previous _idf_diag was indexed
-        # with sorted ngrams and new_index is also indexed with sorted ngrams
-
-        new_idf_data = self._tfidf_vectorizer._tfidf._idf_diag.data[list(new_index)]
-
-        self._tfidf_vectorizer._tfidf._idf_diag = sp.spdiags(new_idf_data, diags=0, m=len(new_index), n=len(new_index), format="csr")
-        # pylint: enable=protected-access
-
-        #! This return is redundant => the returned value is
-        #! not used because the result is set as an attribute
-        return self
-
-    @property
-    def idf_diag(self):
-        if self._tfidf_vectorizer and hasattr(self._tfidf_vectorizer, "vocabulary_"):
-            return self._tfidf_vectorizer.idf_
-        return None
-
-    def _init_vectorizer(self, language):
-        from sklearn.feature_extraction.text import (TfidfVectorizer as SklearnTfidfVectorizer)
-
-        self._tfidf_vectorizer = SklearnTfidfVectorizer(tokenizer=lambda x: tokenize_light(x, language))
-        return self
-
-    @check_persisted_path
-    def persist(self, path):
-        path.mkdir()
-
-        vectorizer_ = None
-        if self._tfidf_vectorizer is not None:
-            vocab = {k: int(v) for k, v in iteritems(self.vocabulary)}
-            idf_diag = self.idf_diag.tolist()
-            vectorizer_ = {
-                "vocab": vocab,
-                "idf_diag": idf_diag
-            }
-
-        builtin_entity_scope = None
-        if self.builtin_entity_scope is not None:
-            builtin_entity_scope = list(self.builtin_entity_scope)
-
-        self_as_dict = {
-            "vectorizer": vectorizer_,
-            "language_code": self.language,
-            "builtin_entity_scope": builtin_entity_scope,
-            "config": self.config.to_dict(),
-        }
-
-        vectorizer_path = path / "vectorizer.json"
-        with vectorizer_path.open("w", encoding="utf-8") as f:
-            f.write(json_string(self_as_dict))
-        self.persist_metadata(path)
-
-    @classmethod
-    # pylint: disable=W0212
-    def from_path(cls, path, **shared):
-        import numpy as np
-        import scipy.sparse as sp
-        from sklearn.feature_extraction.text import (
-            TfidfTransformer, TfidfVectorizer as SklearnTfidfVectorizer)
-
-        path = Path(path)
-
-        model_path = path / "vectorizer.json"
-        if not model_path.exists():
-            raise LoadingError("Missing vectorizer model file: %s"
-                               % model_path.name)
-        with model_path.open("r", encoding="utf-8") as f:
-            vectorizer_dict = json.load(f)
-
-        vectorizer = cls(vectorizer_dict["config"], **shared)
-        vectorizer._language = vectorizer_dict["language_code"]
-
-        builtin_entity_scope = vectorizer_dict["builtin_entity_scope"]
-        if builtin_entity_scope is not None:
-            builtin_entity_scope = set(builtin_entity_scope)
-        vectorizer.builtin_entity_scope = builtin_entity_scope
-
-        vectorizer_ = vectorizer_dict["vectorizer"]
-        if vectorizer_:
-            vocab = vectorizer_["vocab"]
-            idf_diag_data = vectorizer_["idf_diag"]
-            idf_diag_data = np.array(idf_diag_data)
-
-            idf_diag_shape = (len(idf_diag_data), len(idf_diag_data))
-            row = list(range(idf_diag_shape[0]))
-            col = list(range(idf_diag_shape[0]))
-            idf_diag = sp.csr_matrix(
-                (idf_diag_data, (row, col)), shape=idf_diag_shape)
-
-            tfidf_transformer = TfidfTransformer()
-            tfidf_transformer._idf_diag = idf_diag
-
-            vectorizer_ = SklearnTfidfVectorizer(
-                tokenizer=lambda x: tokenize_light(x, vectorizer._language))
-            vectorizer_.vocabulary_ = vocab
-
-            vectorizer_._tfidf = tfidf_transformer
-
-        vectorizer._tfidf_vectorizer = vectorizer_
-        return vectorizer
-
 
 @ProcessingUnit.register("cooccurrence_vectorizer")
 class CooccurrenceVectorizer(ProcessingUnit):
