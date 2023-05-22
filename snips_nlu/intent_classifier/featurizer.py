@@ -393,13 +393,17 @@ class TfidfVectorizer(ProcessingUnit):
 
         # Set builtin entity scope (used in "_preprocess()" method):
         self.builtin_entity_scope = set(e for e in dataset[ENTITIES] if is_builtin_entity(e))
-
+        
+        #! Transform the utterances into a TF-IDF matrix:
+        utterances = [self._enrich_utterance(u, builtin_ents, custom_ents, w_clusters)
+                      for u, builtin_ents, custom_ents, w_clusters
+                      in zip(*self._preprocess(x))]
+        
         # Fit the IDF:
-        # TODO: use sklearn's fit_transform() here:
-        x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(x, dataset)
+        x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(utterances)
 
         # If list of unique words is empty:
-        if not self.tfidf_vectorizer.vocabulary:
+        if not self.vocabulary:
             raise _EmptyDatasetUtterancesError("Dataset is empty or with empty utterances")
 
         # Khi-2 feature selection:
@@ -413,17 +417,14 @@ class TfidfVectorizer(ProcessingUnit):
             best_tfidf_features = set(idx for idx, val in enumerate(tfidf_pval) if val == tfidf_pval.min())
 
         # Get the ngrams corresponding to the best (i.e. significant) features:
-        best_ngrams = [ng for ng, i in iteritems(self.tfidf_vectorizer.vocabulary) if i in best_tfidf_features]
+        best_ngrams = [ng for ng, i in iteritems(self.vocabulary) if i in best_tfidf_features]
 
         # Only keep the significant columns (i.e. features/words):
         #! result is set in the class attribute "self._tfidf_vectorizer.vocabulary_"
-        self.tfidf_vectorizer.limit_vocabulary(best_ngrams)
-
-        #! Transform the utterances into a TF-IDF matrix:
-        utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
+        self.limit_vocabulary(best_ngrams)
 
         #! Use Sklearn's TF-IDF vectorizer method:
-        return self.tfidf_vectorizer._sklearn_tfidf_vectorizer.transform(utterances)
+        return self._sklearn_tfidf_vectorizer.transform(utterances)
 
 
     def _preprocess(self, utterances):
@@ -503,7 +504,7 @@ class TfidfVectorizer(ProcessingUnit):
             return self._sklearn_tfidf_vectorizer.vocabulary_
         return None
 
-    @fitted_required
+    #@fitted_required
     def limit_vocabulary(self, ngrams):
         """Restrict the vectorizer vocabulary to the given ngrams
 
