@@ -432,12 +432,12 @@ class TfidfVectorizer(ProcessingUnit):
 
         try: 
             use_stemming = self.config.vectorizer_config.use_stemming
-            word_clusters_names = self.config.vectorizer_config.word_clusters_names
+            word_clusters_names = self.config.vectorizer_config.word_clusters_name
 
 
         except: 
             use_stemming = self.config.use_stemming
-            word_clusters_names = self.config.word_clusters_names
+            word_clusters_names = self.config.word_clusters_name
 
         for u in normalized_utterances:
             nb_chunks = len(u[DATA])
