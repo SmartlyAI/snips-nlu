@@ -429,10 +429,20 @@ class TfidfVectorizer(ProcessingUnit):
 
     def _preprocess(self, utterances):
         normalized_utterances = deepcopy(utterances)
+
+        try: 
+            use_stemming = self.config.vectorizer_config.use_stemming
+            word_clusters_names = self.config.vectorizer_config.word_clusters_names
+
+
+        except: 
+            use_stemming = self.config.use_stemming
+            word_clusters_names = self.config.word_clusters_names
+
         for u in normalized_utterances:
             nb_chunks = len(u[DATA])
             for i, chunk in enumerate(u[DATA]):
-                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, self.config.vectorizer_config.use_stemming)
+                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, use_stemming)
                 if i < nb_chunks - 1:
                     chunk[TEXT] += " "
 
@@ -449,14 +459,14 @@ class TfidfVectorizer(ProcessingUnit):
                 get_text_from_chunks(u[DATA]), use_cache=True)
             for u in normalized_utterances
         ]
-        if self.config.vectorizer_config.word_clusters_name:
+        if word_clusters_names:
             # Extract world clusters on unormalized utterances
             original_utterances_text = [get_text_from_chunks(u[DATA])
                                         for u in utterances]
             w_clusters = [
                 _get_word_cluster_features(
                     tokenize_light(u.lower(), self.language),
-                    self.config.vectorizer_config.word_clusters_name,
+                    word_clusters_names,
                     self.resources)
                 for u in original_utterances_text
             ]
