@@ -234,7 +234,11 @@ class Featurizer(ProcessingUnit):
         featurizer.language = featurizer_dict["language_code"]
 
         #! TF-IDF, FastText, etc.
-        vectorizer_name = featurizer_dict['config']['vectorizer_config']['unit_name']
+        try:
+            vectorizer_name = featurizer_dict['config']['vectorizer_config']['unit_name']
+
+        except:
+            vectorizer_name = featurizer_dict['config']['tfidf_vectorizer_config']['unit_name']
 
         # Load vectorizer:
         featurizer.vectorizer = cls.load_vectorizer(vectorizer_name, path, featurizer_dict, shared)
