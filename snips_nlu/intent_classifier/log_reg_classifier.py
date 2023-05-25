@@ -80,6 +80,12 @@ class LogRegIntentClassifier(IntentClassifier):
         # utterances: dictionary of utterances and entities
         # classes: list of ints with class indices
         # intent_list: list of intent names plus 'None'
+
+        if self.config.featurizer_config.vectorizer_config.unit_name == 'fasttext_vectorizer':
+
+            # Remove noise data when using FastText embeddings:
+            self.resources['noise'] = ['noise_data_placeholder']
+            
         utterances, classes, intent_list = build_training_data(dataset, language, data_augmentation_config, self.resources, self.random_state)
 
         # Save list of intents:
