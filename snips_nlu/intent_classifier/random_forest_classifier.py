@@ -105,10 +105,10 @@ class RandForIntentClassifier(IntentClassifier):
         class_weights_arr[-1] *= self.config.noise_reweight_factor
         class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
 
-        self.classifier = RandomForestClassifier(
-            random_state=self.random_state, alpha=alpha,
-            class_weight=class_weight, **LOG_REG_ARGS)
+        # Instantiate the classifier:
+        self.classifier = RandomForestClassifier(random_state=self.random_state, class_weight=class_weight)
 
+        # Fit the classifier:
         self.classifier.fit(x, classes)
 
         logger.debug("%s", DifferedLoggingMessage(self.log_best_features))
