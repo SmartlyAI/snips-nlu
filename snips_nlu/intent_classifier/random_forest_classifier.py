@@ -4,6 +4,7 @@ import json
 import logging
 from builtins import range, str, zip
 from pathlib import Path
+import joblib
 
 from snips_nlu.common.log_utils import DifferedLoggingMessage, log_elapsed_time
 from snips_nlu.common.utils import check_persisted_path, fitted_required, json_string
@@ -196,35 +197,37 @@ class RandForIntentClassifier(IntentClassifier):
     @check_persisted_path
     def persist(self, path):
         """Persists the object at the given path"""
-        path.mkdir()
 
-        featurizer = None
+        # Make new directory with unique path:
+        path.mkdir()
+        
+        # Persist featurizer config:
         if self.featurizer is not None:
             featurizer = "featurizer"
             featurizer_path = path / featurizer
             self.featurizer.persist(featurizer_path)
 
-        coeffs = None
-        intercept = None
-        t_ = None
-        if self.classifier is not None:
-            coeffs = self.classifier.coef_.tolist()
-            intercept = self.classifier.intercept_.tolist()
-            t_ = self.classifier.t_
 
+        # Classifier's config dict:
         self_as_dict = {
             "config": self.config.to_dict(),
-            "coeffs": coeffs,
-            "intercept": intercept,
-            "t_": t_,
             "intent_list": self.intent_list,
             "featurizer": featurizer
         }
 
+        # Convert config to JSON:
         classifier_json = json_string(self_as_dict)
+
+        # Persist the JSON:
         with (path / "intent_classifier.json").open(mode="w", encoding="utf8") as f:
             f.write(classifier_json)
+
+        # Add metadata:
         self.persist_metadata(path)
+
+        # Persist the classifier:
+        joblib.dump(self.classifier, str(path / "random_forest_model.joblib"), compress=3)
+
 
     @classmethod
     def from_path(cls, path, **shared):
@@ -239,35 +242,24 @@ class RandForIntentClassifier(IntentClassifier):
         path = Path(path)
         model_path = path / "intent_classifier.json"
         if not model_path.exists():
-            raise LoadingError("Missing intent classifier model file: %s"
-                               % model_path.name)
+            raise LoadingError("Missing intent classifier model file: %s" % model_path.name)
 
         with model_path.open(encoding="utf8") as f:
             model_dict = json.load(f)
 
         # Create the classifier
-        config = LogRegIntentClassifierConfig.from_dict(model_dict["config"])
+        config = RandForIntentClassifierConfig.from_dict(model_dict["config"])
         intent_classifier = cls(config=config, **shared)
         intent_classifier.intent_list = model_dict['intent_list']
 
-        # Create the underlying SGD classifier
-        sgd_classifier = None
-        coeffs = model_dict['coeffs']
-        intercept = model_dict['intercept']
-        t_ = model_dict["t_"]
-        if coeffs is not None and intercept is not None:
-            sgd_classifier = RandomForestClassifier(**LOG_REG_ARGS)
-            sgd_classifier.coef_ = np.array(coeffs)
-            sgd_classifier.intercept_ = np.array(intercept)
-            sgd_classifier.t_ = t_
-        intent_classifier.classifier = sgd_classifier
+        # Create the underlying SGD classifier 
+        intent_classifier.classifier = joblib.load(str(path / "random_forest_model.joblib"))
 
         # Add the featurizer
         featurizer = model_dict['featurizer']
         if featurizer is not None:
             featurizer_path = path / featurizer
-            intent_classifier.featurizer = Featurizer.from_path(
-                featurizer_path, **shared)
+            intent_classifier.featurizer = Featurizer.from_path(featurizer_path, **shared)
 
         return intent_classifier
 
