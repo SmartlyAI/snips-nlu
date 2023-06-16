@@ -236,8 +236,6 @@ class RandForIntentClassifier(IntentClassifier):
         The data at the given path must have been generated using
         :func:`~RandForIntentClassifier.persist`
         """
-        import numpy as np
-        from sklearn.ensemble import RandomForestClassifier
 
         path = Path(path)
         model_path = path / "intent_classifier.json"
