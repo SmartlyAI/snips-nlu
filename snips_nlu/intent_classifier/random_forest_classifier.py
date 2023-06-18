@@ -98,8 +98,6 @@ class RandForIntentClassifier(IntentClassifier):
             self.featurizer = None
             return self
 
-        alpha = get_regularization_factor(dataset)
-
         class_weights_arr = compute_class_weight("balanced", range(none_class + 1), classes)
 
         # Re-weight the noise class
@@ -154,23 +152,44 @@ class RandForIntentClassifier(IntentClassifier):
 
 
     def _get_intents(self, text, intents_filter):
+        """Performs intent classification on the provided *text* and returns
+        the list of intents ordered by decreasing probability"""
+
         if isinstance(intents_filter, str):
             intents_filter = {intents_filter}
+
         elif isinstance(intents_filter, list):
             intents_filter = set(intents_filter)
 
         if not text or not self.intent_list or not self.featurizer:
+            """ The function intent_classification_result() simply formats whatever
+            intent name and probability it receives into a dict.
+
+            Example:
+
+            intent_classification_result("GetWeather", 0.93)
+            Returns : {'intentName': 'GetWeather', 'probability': 0.93}
+            """
+
+            # If no text or no intent list or no featurizer, return None with 100% probability:
             results = [intent_classification_result(None, 1.0)]
+
+            # Append the rest of the intents with 0% probability:
             results += [intent_classification_result(i, 0.0) for i in self.intent_list if i is not None]
+
             return results
 
+        # If only one intent, return it with 100% probability:
         if len(self.intent_list) == 1:
             return [intent_classification_result(self.intent_list[0], 1.0)]
 
         # pylint: disable=C0103
+        # Transform the text into a vector of features:
         X = self.featurizer.transform([text_to_utterance(text)])
+
         # pylint: enable=C0103
-        proba_vec = self._predict_proba(X)
+        proba_vec = self.intent_classifier.predict_proba(X)
+
         logger.debug("%s", DifferedLoggingMessage(self.log_activation_weights, text, X))
 
         results = [
@@ -179,20 +198,7 @@ class RandForIntentClassifier(IntentClassifier):
             if intents_filter is None or i is None or i in intents_filter]
 
         return sorted(results, key=lambda res: -res[RES_PROBA])
-
-    def _predict_proba(self, X):  # pylint: disable=C0103
-        import numpy as np
-
-        self.classifier._check_proba()  # pylint: disable=W0212
-
-        prob = self.classifier.decision_function(X)
-        prob *= -1
-        np.exp(prob, prob)
-        prob += 1
-        np.reciprocal(prob, prob)
-        if prob.ndim == 1:
-            return np.vstack([1 - prob, prob]).T
-        return prob
+    
 
     @check_persisted_path
     def persist(self, path):
