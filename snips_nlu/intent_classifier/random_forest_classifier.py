@@ -73,10 +73,21 @@ class RandForIntentClassifier(IntentClassifier):
         language = dataset[LANGUAGE]
         
         data_augmentation_config = self.config.data_augmentation_config
+        
+        # Remove noise data when using FastText embeddings:
+        if self.config.featurizer_config.vectorizer_config.unit_name == 'fasttext_vectorizer':
 
+            # Remove noise data when using FastText embeddings:
+            self.resources['noise'] = ['noise_data_placeholder']
+        
+
+        # Build training data:
         utterances, classes, intent_list = build_training_data(dataset, language, data_augmentation_config, self.resources, self.random_state)
 
+        # Store intent list:
         self.intent_list = intent_list
+
+        # If there is only one intent, we don't need to train a classifier (i.e. return instance):
         if len(self.intent_list) <= 1:
             return self
 
