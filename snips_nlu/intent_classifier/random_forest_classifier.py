@@ -188,7 +188,7 @@ class RandForIntentClassifier(IntentClassifier):
         X = self.featurizer.transform([text_to_utterance(text)])
 
         # pylint: enable=C0103
-        proba_vec = self.intent_classifier.predict_proba(X)
+        proba_vec = self.classifier.predict_proba(X)
 
         logger.debug("%s", DifferedLoggingMessage(self.log_activation_weights, text, X))
 
