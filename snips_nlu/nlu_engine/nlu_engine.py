@@ -39,7 +39,7 @@ logger = logging.getLogger(__name__)
 
 @ProcessingUnit.register("nlu_engine")
 class SnipsNLUEngine(ProcessingUnit):
-    """Main class to use for intent parsing
+    """Main class to use for intent parsing. **This is Snips' entry point**
 
     A :class:`SnipsNLUEngine` relies on a list of :class:`.IntentParser`
     object to parse intents, by calling them successively using the first
@@ -79,8 +79,7 @@ class SnipsNLUEngine(ProcessingUnit):
         """Whether or not the nlu engine has already been fitted"""
         return self.dataset_metadata is not None
 
-    @log_elapsed_time(
-        logger, logging.INFO, "Fitted NLU engine in {elapsed_time}")
+    @log_elapsed_time(logger, logging.INFO, "Fitted NLU engine in {elapsed_time}")
     def fit(self, dataset, force_retrain=True):
         """Fits the NLU engine
 
@@ -94,7 +93,8 @@ class SnipsNLUEngine(ProcessingUnit):
         """
         dataset = validate_and_format_dataset(dataset)
 
-        # If not config dict was supplied when instantiating SnipsNLUEngine:
+        # If no config dict was supplied when instantiating SnipsNLUEngine
+        #! This is skipped as we usually pass a config dict when instantiating SnipsNLUEngine()
         if self.config is None:
             language = dataset[LANGUAGE]
             default_config = DEFAULT_CONFIGS.get(language)
@@ -102,16 +102,21 @@ class SnipsNLUEngine(ProcessingUnit):
                 self.config = self.config_type.from_dict(default_config)
             else:
                 self.config = self.config_type()
+        
+        #! This gets executed to get resources for the language (i.e stop words, noise data, etc.)
+        #! then fits the parsers for system & custom entities 
         self.load_resources_if_needed(dataset[LANGUAGE]) 
         self.fit_builtin_entity_parser_if_needed(dataset) 
         self.fit_custom_entity_parser_if_needed(dataset)
 
+        # List where we store the fitted intent parsers
         parsers = []
 
         # For each unit config in the input config dictionary:
         for parser_config in self.config.intent_parsers_configs:
 
             # Re-use existing parsers to allow pre-training
+            #! Skipped since we don't have any pre-trained parsers
             recycled_parser = None
             for parser in self.intent_parsers:
                 if parser.unit_name == parser_config.unit_name:
@@ -135,7 +140,7 @@ class SnipsNLUEngine(ProcessingUnit):
             # Train current parser:
             if force_retrain or not recycled_parser.fitted: 
                 try: recycled_parser.fit(dataset, force_retrain)
-                except Exception as e: print('Error recycled_parser.fitted', str(e))
+                except Exception as e: print('ERROR - recycled_parser.fitted', str(e))
             
             # Append final trained parser:
             parsers.append(recycled_parser)
@@ -398,14 +403,16 @@ class SnipsNLUEngine(ProcessingUnit):
                     parser_path)
 
         config = cls.config_type.from_dict(model["config"])
+
         nlu_engine = cls(config=config, **shared)
+
         nlu_engine.dataset_metadata = dataset_metadata
+
         intent_parsers = []
         for parser_idx, parser_name in enumerate(model["intent_parsers"]):
             parser_config = config.intent_parsers_configs[parser_idx]
             intent_parser_path = directory_path / parser_name
-            intent_parser = IntentParser.load_from_path(
-                intent_parser_path, parser_config.unit_name, **shared)
+            intent_parser = IntentParser.load_from_path(intent_parser_path, parser_config.unit_name, **shared)
             intent_parsers.append(intent_parser)
         nlu_engine.intent_parsers = intent_parsers
         return nlu_engine

@@ -9,6 +9,89 @@ from snips_nlu.pipeline.configs import Config, ProcessingUnitConfig
 from snips_nlu.resources import merge_required_resources
 
 
+
+
+class RandForIntentClassifierConfig(FromDict, ProcessingUnitConfig):
+    """Configuration of a :class:`.LogRegIntentClassifier`"""
+
+    # pylint: disable=line-too-long
+    def __init__(self, data_augmentation_config=None, featurizer_config=None,
+                 noise_reweight_factor=1.0):
+        """
+        Args:
+            data_augmentation_config (:class:`IntentClassifierDataAugmentationConfig`):
+                    Defines the strategy of the underlying data augmentation
+            featurizer_config (:class:`FeaturizerConfig`): Configuration of the
+                :class:`.Featurizer` used underneath
+            noise_reweight_factor (float, optional): this parameter allows to
+                change the weight of the None class. By default, the class
+                weights are computed using a "balanced" strategy. The
+                noise_reweight_factor allows to deviate from this strategy.
+        """
+        if data_augmentation_config is None:
+            data_augmentation_config = IntentClassifierDataAugmentationConfig()
+        if featurizer_config is None:
+            featurizer_config = FeaturizerConfig()
+        self._data_augmentation_config = None
+        self.data_augmentation_config = data_augmentation_config
+        self._featurizer_config = None
+        self.featurizer_config = featurizer_config
+        self.noise_reweight_factor = noise_reweight_factor
+
+    # pylint: enable=line-too-long
+
+    @property
+    def data_augmentation_config(self):
+        return self._data_augmentation_config
+
+    @data_augmentation_config.setter
+    def data_augmentation_config(self, value):
+        if isinstance(value, dict):
+            self._data_augmentation_config = \
+                IntentClassifierDataAugmentationConfig.from_dict(value)
+        elif isinstance(value, IntentClassifierDataAugmentationConfig):
+            self._data_augmentation_config = value
+        else:
+            raise TypeError("Expected instance of "
+                            "IntentClassifierDataAugmentationConfig or dict"
+                            "but received: %s" % type(value))
+
+    @property
+    def featurizer_config(self):
+        return self._featurizer_config
+
+    @featurizer_config.setter
+    def featurizer_config(self, value):
+        if isinstance(value, dict):
+            self._featurizer_config = \
+                FeaturizerConfig.from_dict(value)
+        elif isinstance(value, FeaturizerConfig):
+            self._featurizer_config = value
+        else:
+            raise TypeError("Expected instance of FeaturizerConfig or dict"
+                            "but received: %s" % type(value))
+
+    @property
+    def unit_name(self):
+        from snips_nlu.intent_classifier import RandForIntentClassifier
+        return RandForIntentClassifier.unit_name
+
+    def get_required_resources(self):
+        resources = self.data_augmentation_config.get_required_resources()
+        resources = merge_required_resources(
+            resources, self.featurizer_config.get_required_resources())
+        return resources
+
+    def to_dict(self):
+        return {
+            "unit_name": self.unit_name,
+            "data_augmentation_config":
+                self.data_augmentation_config.to_dict(),
+            "featurizer_config": self.featurizer_config.to_dict(),
+            "noise_reweight_factor": self.noise_reweight_factor,
+        }
+
+
 class LogRegIntentClassifierConfig(FromDict, ProcessingUnitConfig):
     """Configuration of a :class:`.LogRegIntentClassifier`"""
 
@@ -147,7 +230,7 @@ class FeaturizerConfig(FromDict, ProcessingUnitConfig):
     """Configuration of a :class:`.Featurizer` object"""
 
     # pylint: disable=line-too-long
-    def __init__(self, tfidf_vectorizer_config=None,
+    def __init__(self, vectorizer_config=None,
                  cooccurrence_vectorizer_config=None,
                  pvalue_threshold=0.4,
                  added_cooccurrence_feature_ratio=0):
@@ -172,22 +255,26 @@ class FeaturizerConfig(FromDict, ProcessingUnitConfig):
                 cooccurrence features will be added
         """
         self.pvalue_threshold = pvalue_threshold
-        self.added_cooccurrence_feature_ratio = \
-            added_cooccurrence_feature_ratio
+        self.added_cooccurrence_feature_ratio = added_cooccurrence_feature_ratio
 
-        if tfidf_vectorizer_config is None:
-            tfidf_vectorizer_config = TfidfVectorizerConfig()
-        elif isinstance(tfidf_vectorizer_config, dict):
-            tfidf_vectorizer_config = TfidfVectorizerConfig.from_dict(
-                tfidf_vectorizer_config)
-        self.tfidf_vectorizer_config = tfidf_vectorizer_config
+        #! TF-IDF config:
+        if vectorizer_config is None:
+            vectorizer_config = VectorizerConfig()
 
+        elif isinstance(vectorizer_config, dict):
+            vectorizer_config = VectorizerConfig.from_dict(vectorizer_config)
+
+        self.vectorizer_config = vectorizer_config
+
+        #! Cooccurrence config:
         if cooccurrence_vectorizer_config is None:
             cooccurrence_vectorizer_config = CooccurrenceVectorizerConfig()
+
         elif isinstance(cooccurrence_vectorizer_config, dict):
-            cooccurrence_vectorizer_config = CooccurrenceVectorizerConfig \
-                .from_dict(cooccurrence_vectorizer_config)
+            cooccurrence_vectorizer_config = CooccurrenceVectorizerConfig.from_dict(cooccurrence_vectorizer_config)
+            
         self.cooccurrence_vectorizer_config = cooccurrence_vectorizer_config
+
 
     # pylint: enable=line-too-long
 
@@ -197,30 +284,27 @@ class FeaturizerConfig(FromDict, ProcessingUnitConfig):
         return Featurizer.unit_name
 
     def get_required_resources(self):
-        required_resources = self.tfidf_vectorizer_config \
-            .get_required_resources()
+
+        required_resources = self.vectorizer_config.get_required_resources()
+
         if self.cooccurrence_vectorizer_config:
-            required_resources = merge_required_resources(
-                required_resources,
-                self.cooccurrence_vectorizer_config.get_required_resources())
+            required_resources = merge_required_resources(required_resources, self.cooccurrence_vectorizer_config.get_required_resources())
         return required_resources
 
     def to_dict(self):
         return {
             "unit_name": self.unit_name,
             "pvalue_threshold": self.pvalue_threshold,
-            "added_cooccurrence_feature_ratio":
-                self.added_cooccurrence_feature_ratio,
-            "tfidf_vectorizer_config": self.tfidf_vectorizer_config.to_dict(),
-            "cooccurrence_vectorizer_config":
-                self.cooccurrence_vectorizer_config.to_dict(),
+            "added_cooccurrence_feature_ratio": self.added_cooccurrence_feature_ratio,
+            "vectorizer_config": self.vectorizer_config.to_dict(),
+            "cooccurrence_vectorizer_config": self.cooccurrence_vectorizer_config.to_dict(),
         }
+    
 
-
-class TfidfVectorizerConfig(FromDict, ProcessingUnitConfig):
+class VectorizerConfig(FromDict, ProcessingUnitConfig):
     """Configuration of a :class:`.TfidfVectorizerConfig` object"""
 
-    def __init__(self, word_clusters_name=None, use_stemming=False):
+    def __init__(self, word_clusters_name=None, use_stemming=False, unit_name=None):
         """
         Args:
             word_clusters_name (str, optional): if a word cluster name is
@@ -232,11 +316,11 @@ class TfidfVectorizerConfig(FromDict, ProcessingUnitConfig):
         """
         self.word_clusters_name = word_clusters_name
         self.use_stemming = use_stemming
+        self.unit_name = unit_name
 
-    @property
+    #@property
     def unit_name(self):
-        from snips_nlu.intent_classifier import TfidfVectorizer
-        return TfidfVectorizer.unit_name
+        pass
 
     def get_required_resources(self):
         resources = {STEMS: True if self.use_stemming else False}

@@ -4,6 +4,7 @@ import json
 import logging
 from builtins import range, str, zip
 from pathlib import Path
+import joblib
 
 from snips_nlu.common.log_utils import DifferedLoggingMessage, log_elapsed_time
 from snips_nlu.common.utils import check_persisted_path, fitted_required, json_string
@@ -13,7 +14,7 @@ from snips_nlu.exceptions import LoadingError, _EmptyDatasetUtterancesError
 from snips_nlu.intent_classifier.featurizer import Featurizer
 from snips_nlu.intent_classifier.intent_classifier import IntentClassifier
 from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, get_regularization_factor, text_to_utterance
-from snips_nlu.pipeline.configs import LogRegIntentClassifierConfig
+from snips_nlu.pipeline.configs import RandForIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
 
 logger = logging.getLogger(__name__)
@@ -39,7 +40,7 @@ LOG_REG_ARGS = {
 class RandForIntentClassifier(IntentClassifier):
     """Intent classifier which uses a Random Forest Classifier underneath"""
 
-    config_type = LogRegIntentClassifierConfig
+    config_type = RandForIntentClassifierConfig
 
     def __init__(self, config=None, **shared):
         """The LogReg intent classifier can be configured by passing a
@@ -72,10 +73,21 @@ class RandForIntentClassifier(IntentClassifier):
         language = dataset[LANGUAGE]
         
         data_augmentation_config = self.config.data_augmentation_config
+        
+        # Remove noise data when using FastText embeddings:
+        if self.config.featurizer_config.vectorizer_config.unit_name == 'fasttext_vectorizer':
 
+            # Remove noise data when using FastText embeddings:
+            self.resources['noise'] = ['noise_data_placeholder']
+        
+
+        # Build training data:
         utterances, classes, intent_list = build_training_data(dataset, language, data_augmentation_config, self.resources, self.random_state)
 
+        # Store intent list:
         self.intent_list = intent_list
+
+        # If there is only one intent, we don't need to train a classifier (i.e. return instance):
         if len(self.intent_list) <= 1:
             return self
 
@@ -97,18 +109,16 @@ class RandForIntentClassifier(IntentClassifier):
             self.featurizer = None
             return self
 
-        alpha = get_regularization_factor(dataset)
-
         class_weights_arr = compute_class_weight("balanced", range(none_class + 1), classes)
 
         # Re-weight the noise class
         class_weights_arr[-1] *= self.config.noise_reweight_factor
         class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
 
-        self.classifier = RandomForestClassifier(
-            random_state=self.random_state, alpha=alpha,
-            class_weight=class_weight, **LOG_REG_ARGS)
+        # Instantiate the classifier:
+        self.classifier = RandomForestClassifier(random_state=self.random_state, class_weight=class_weight)
 
+        # Fit the classifier:
         self.classifier.fit(x, classes)
 
         logger.debug("%s", DifferedLoggingMessage(self.log_best_features))
@@ -153,23 +163,44 @@ class RandForIntentClassifier(IntentClassifier):
 
 
     def _get_intents(self, text, intents_filter):
+        """Performs intent classification on the provided *text* and returns
+        the list of intents ordered by decreasing probability"""
+
         if isinstance(intents_filter, str):
             intents_filter = {intents_filter}
+
         elif isinstance(intents_filter, list):
             intents_filter = set(intents_filter)
 
         if not text or not self.intent_list or not self.featurizer:
+            """ The function intent_classification_result() simply formats whatever
+            intent name and probability it receives into a dict.
+
+            Example:
+
+            intent_classification_result("GetWeather", 0.93)
+            Returns : {'intentName': 'GetWeather', 'probability': 0.93}
+            """
+
+            # If no text or no intent list or no featurizer, return None with 100% probability:
             results = [intent_classification_result(None, 1.0)]
+
+            # Append the rest of the intents with 0% probability:
             results += [intent_classification_result(i, 0.0) for i in self.intent_list if i is not None]
+
             return results
 
+        # If only one intent, return it with 100% probability:
         if len(self.intent_list) == 1:
             return [intent_classification_result(self.intent_list[0], 1.0)]
 
         # pylint: disable=C0103
+        # Transform the text into a vector of features:
         X = self.featurizer.transform([text_to_utterance(text)])
+
         # pylint: enable=C0103
-        proba_vec = self._predict_proba(X)
+        proba_vec = self.classifier.predict_proba(X)
+
         logger.debug("%s", DifferedLoggingMessage(self.log_activation_weights, text, X))
 
         results = [
@@ -178,53 +209,42 @@ class RandForIntentClassifier(IntentClassifier):
             if intents_filter is None or i is None or i in intents_filter]
 
         return sorted(results, key=lambda res: -res[RES_PROBA])
-
-    def _predict_proba(self, X):  # pylint: disable=C0103
-        import numpy as np
-
-        self.classifier._check_proba()  # pylint: disable=W0212
-
-        prob = self.classifier.decision_function(X)
-        prob *= -1
-        np.exp(prob, prob)
-        prob += 1
-        np.reciprocal(prob, prob)
-        if prob.ndim == 1:
-            return np.vstack([1 - prob, prob]).T
-        return prob
+    
 
     @check_persisted_path
     def persist(self, path):
         """Persists the object at the given path"""
-        path.mkdir()
 
-        featurizer = None
+        # Make new directory with unique path:
+        path.mkdir()
+        
+        # Persist featurizer config:
         if self.featurizer is not None:
             featurizer = "featurizer"
             featurizer_path = path / featurizer
             self.featurizer.persist(featurizer_path)
 
-        coeffs = None
-        intercept = None
-        t_ = None
-        if self.classifier is not None:
-            coeffs = self.classifier.coef_.tolist()
-            intercept = self.classifier.intercept_.tolist()
-            t_ = self.classifier.t_
 
+        # Classifier's config dict:
         self_as_dict = {
             "config": self.config.to_dict(),
-            "coeffs": coeffs,
-            "intercept": intercept,
-            "t_": t_,
             "intent_list": self.intent_list,
             "featurizer": featurizer
         }
 
+        # Convert config to JSON:
         classifier_json = json_string(self_as_dict)
+
+        # Persist the JSON:
         with (path / "intent_classifier.json").open(mode="w", encoding="utf8") as f:
             f.write(classifier_json)
+
+        # Add metadata:
         self.persist_metadata(path)
+
+        # Persist the classifier:
+        joblib.dump(self.classifier, str(path / "random_forest_model.joblib"), compress=3)
+
 
     @classmethod
     def from_path(cls, path, **shared):
@@ -233,41 +253,28 @@ class RandForIntentClassifier(IntentClassifier):
         The data at the given path must have been generated using
         :func:`~RandForIntentClassifier.persist`
         """
-        import numpy as np
-        from sklearn.ensemble import RandomForestClassifier
 
         path = Path(path)
         model_path = path / "intent_classifier.json"
         if not model_path.exists():
-            raise LoadingError("Missing intent classifier model file: %s"
-                               % model_path.name)
+            raise LoadingError("Missing intent classifier model file: %s" % model_path.name)
 
         with model_path.open(encoding="utf8") as f:
             model_dict = json.load(f)
 
         # Create the classifier
-        config = LogRegIntentClassifierConfig.from_dict(model_dict["config"])
+        config = RandForIntentClassifierConfig.from_dict(model_dict["config"])
         intent_classifier = cls(config=config, **shared)
         intent_classifier.intent_list = model_dict['intent_list']
 
-        # Create the underlying SGD classifier
-        sgd_classifier = None
-        coeffs = model_dict['coeffs']
-        intercept = model_dict['intercept']
-        t_ = model_dict["t_"]
-        if coeffs is not None and intercept is not None:
-            sgd_classifier = RandomForestClassifier(**LOG_REG_ARGS)
-            sgd_classifier.coef_ = np.array(coeffs)
-            sgd_classifier.intercept_ = np.array(intercept)
-            sgd_classifier.t_ = t_
-        intent_classifier.classifier = sgd_classifier
+        # Create the underlying SGD classifier 
+        intent_classifier.classifier = joblib.load(str(path / "random_forest_model.joblib"))
 
         # Add the featurizer
         featurizer = model_dict['featurizer']
         if featurizer is not None:
             featurizer_path = path / featurizer
-            intent_classifier.featurizer = Featurizer.from_path(
-                featurizer_path, **shared)
+            intent_classifier.featurizer = Featurizer.from_path(featurizer_path, **shared)
 
         return intent_classifier
 

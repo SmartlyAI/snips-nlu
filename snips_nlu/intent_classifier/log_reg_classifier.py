@@ -80,6 +80,12 @@ class LogRegIntentClassifier(IntentClassifier):
         # utterances: dictionary of utterances and entities
         # classes: list of ints with class indices
         # intent_list: list of intent names plus 'None'
+
+        if self.config.featurizer_config.vectorizer_config.unit_name == 'fasttext_vectorizer':
+
+            # Remove noise data when using FastText embeddings:
+            self.resources['noise'] = ['noise_data_placeholder']
+            
         utterances, classes, intent_list = build_training_data(dataset, language, data_augmentation_config, self.resources, self.random_state)
 
         # Save list of intents:
@@ -90,12 +96,11 @@ class LogRegIntentClassifier(IntentClassifier):
             return self
 
         # Instantiate featurizer (includes TF-IDF and Cooccurrence):
-        self.featurizer = Featurizer(
-            config=self.config.featurizer_config,
-            builtin_entity_parser=self.builtin_entity_parser,
-            custom_entity_parser=self.custom_entity_parser,
-            resources=self.resources,
-            random_state=self.random_state,
+        self.featurizer = Featurizer(config=self.config.featurizer_config,
+                                    builtin_entity_parser=self.builtin_entity_parser,
+                                    custom_entity_parser=self.custom_entity_parser,
+                                    resources=self.resources,
+                                    random_state=self.random_state,
         )
 
         # Featurizer's language:
@@ -283,8 +288,7 @@ class LogRegIntentClassifier(IntentClassifier):
         featurizer = model_dict['featurizer']
         if featurizer is not None:
             featurizer_path = path / featurizer
-            intent_classifier.featurizer = Featurizer.from_path(
-                featurizer_path, **shared)
+            intent_classifier.featurizer = Featurizer.from_path(featurizer_path, **shared)
 
         return intent_classifier
 

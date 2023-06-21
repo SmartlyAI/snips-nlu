@@ -16,7 +16,7 @@ from snips_nlu.pipeline.configs import (
     NLUEngineConfig, ProbabilisticIntentParserConfig,
     SlotFillerDataAugmentationConfig)
 from snips_nlu.pipeline.configs.intent_classifier import (
-    CooccurrenceVectorizerConfig, TfidfVectorizerConfig)
+    CooccurrenceVectorizerConfig, VectorizerConfig)
 from snips_nlu.tests.utils import SnipsTest
 
 
@@ -56,7 +56,7 @@ class TestConfig(SnipsTest):
 
     def test_featurizer_config(self):
         # Given
-        tfid_vectorizer_config = TfidfVectorizerConfig()
+        tfid_vectorizer_config = VectorizerConfig()
         cooccurrence_vectorizer_config = CooccurrenceVectorizerConfig()
         config_dict = {
             "unit_name": "featurizer",
@@ -83,7 +83,7 @@ class TestConfig(SnipsTest):
         }
 
         # When
-        config = TfidfVectorizerConfig.from_dict(config_dict)
+        config = VectorizerConfig.from_dict(config_dict)
         serialized_config = config.to_dict()
 
         # Then
