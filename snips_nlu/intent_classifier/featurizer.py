@@ -691,7 +691,7 @@ class FastTextVectorizer(ProcessingUnit):
         self._language = dataset[LANGUAGE]
         
         # Initialize FastText model:
-        fast_model = self.from_path() 
+        fast_model = self.from_path(self._language) 
 
         # Enrich utterances with builtin entities:
         utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
@@ -769,10 +769,9 @@ class FastTextVectorizer(ProcessingUnit):
 
         return features
 
-    @classmethod
-    def from_path(cls, path=None, **shared):
+    def from_path(self, lang, path=None, **shared):
         import compress_fasttext
-        return compress_fasttext.models.CompressedFastTextKeyedVectors.load('./resources/embeddings/cc.fr.300-quantized')
+        return compress_fasttext.models.CompressedFastTextKeyedVectors.load(f'./resources/embeddings/cc.{lang}.300-quantized')
 
 
     # Doesn't need to be persisted (pre-trained model) => pass because it's an abstract method:    
