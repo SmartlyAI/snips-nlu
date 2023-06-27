@@ -663,7 +663,7 @@ class FastTextVectorizer(ProcessingUnit):
     def transform(self, x):
 
         raw_utterance = x[0]['data'][0]['text'].strip()
-        fast_model = self.from_path()
+        fast_model = self.from_path(self.__class__.__bases__[0].by_name('language'))
         x_fasttext = fast_model[raw_utterance]
         x_csr = sparse.csr_matrix(x_fasttext)
 
