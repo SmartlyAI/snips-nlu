@@ -696,11 +696,23 @@ class FastTextVectorizer(ProcessingUnit):
         # Enrich utterances with builtin entities:
         utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
 
+
+        # TF-IDF embeddings:
+        from sklearn.feature_extraction.text import (TfidfVectorizer as SklearnTfidfVectorizer)
+        self._sklearn_tfidf_vectorizer = SklearnTfidfVectorizer()
+
+        # Transformed data:
+        x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(utterances)
+
         # Fit the FastText vectorizer => outputs dense Numpy array of arrays:
         x_fasttext = fast_model[utterances]
 
+        # Merge FastText and TFIDF:
+        import scipy.sparse as sp
+        x_final = sp.hstack([x_fasttext, x_tfidf])
+
         # Convert Numpy array to Scipy CSR sparse matrix:
-        x_csr = sparse.csr_matrix(x_fasttext)
+        x_csr = sparse.csr_matrix(x_final)   
 
         return x_csr
 
