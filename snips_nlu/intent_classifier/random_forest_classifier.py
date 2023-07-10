@@ -306,8 +306,8 @@ class RandForIntentClassifier(IntentClassifier):
 
             # Plot PCA:
             fig = plt.figure(figsize=(8, 8))
-            plt.scatter(self.pca_x[:, 0],
-                        self.pca_x[:, 1],
+            plt.scatter(self.pcad_x[:, 0],
+                        self.pcad_x[:, 1],
                         c=self.classes,
                         cmap=plt.cm.get_cmap("jet", len(self.intent_list)), s=10, alpha=0.7)
             
