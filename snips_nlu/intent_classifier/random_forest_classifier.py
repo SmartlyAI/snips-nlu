@@ -128,7 +128,7 @@ class RandForIntentClassifier(IntentClassifier):
             pca = PCA(n_components=2, random_state=self.random_state)
 
             # Fit transform PCA:
-            self.pcad_x = pca.fit_transform(x)
+            self.pcad_x = pca.fit_transform(x.toarray())
 
             # Fit transform TSNE for 3 values of Perplexity: 5, N**1/2, 50
             self.tsned_x = {}
@@ -143,7 +143,7 @@ class RandForIntentClassifier(IntentClassifier):
                             )
                 
                 # Fit transform t-SNE and store the result in the tsned_x dict attribute:
-                tsned_x = tsne.fit_transform(x)
+                tsned_x = tsne.fit_transform(x.toarray())
                 self.tsned_x[perplexity] = tsned_x
 
             # Persist the classes:
