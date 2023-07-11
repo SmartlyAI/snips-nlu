@@ -117,14 +117,6 @@ class RandForIntentClassifier(IntentClassifier):
         # Instantiate the classifier:
         self.classifier = RandomForestClassifier(random_state=self.random_state, class_weight=class_weight)
 
-        # t-SNE transform:
-        from sklearn.manifold import TSNE
-        self.tsne = TSNE(n_components=2, random_state=self.random_state, perplexity = 50)
-
-        x = self.tsne.fit_transform(x.toarray())
-
-
-
         # Dimensionality reduction for debugging visualizations:
         if DEBUG:
 
@@ -237,6 +229,9 @@ class RandForIntentClassifier(IntentClassifier):
         # Transform the text into a vector of features:
         X = self.featurizer.transform([text_to_utterance(text)])
 
+        # Load trained t-SNE instance:
+        tsne = joblib.load(self.tsne_path)
+
         # pylint: enable=C0103
         proba_vec = self.classifier.predict_proba(X)
 
@@ -284,9 +279,8 @@ class RandForIntentClassifier(IntentClassifier):
         # Persist the classifier:
         joblib.dump(self.classifier, str(path / "random_forest_model.joblib"), compress=3)
 
-        # Persist t-SNE trained embeddings:
-        joblib.dump(self.tsne, str(path / "tsne.joblib"), compress=3)
-
+        # Persist TF-IDF vectorizer:
+        joblib.dump(self.featurizer.vectorizer._sklearn_tfidf_vectorizer, str(path / "tfidf.joblib"), compress=3)
 
         # t-SNE and PCA embeddings if debug mode is on:
         if DEBUG:
