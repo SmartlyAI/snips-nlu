@@ -5,6 +5,7 @@ from builtins import str, zip
 from copy import deepcopy
 from pathlib import Path
 from scipy import sparse
+import joblib
 
 from future.utils import iteritems
 
@@ -661,11 +662,23 @@ class FastTextVectorizer(ProcessingUnit):
     # Simply calls "fit_transform" (to stay consistent with the "Featurizer" API)
     # We don't need "y" for the FastText vectorizer but we keep it for consistency:
     def transform(self, x):
-
+        
+        # Raw string of the input sentence:
         raw_utterance = x[0]['data'][0]['text'].strip()
+
+        # Load the FastText model and transform the input sentence into a vector:
         fast_model = self.from_path(self.__class__.__bases__[0].by_name('language'))
         x_fasttext = fast_model[raw_utterance]
-        x_csr = sparse.csr_matrix(x_fasttext)
+
+        # Bot's model ID:
+        model_id = self.__class__.__bases__[0].by_name('model_id')
+
+        # Load the TF-IDF model and transform the input sentence into a vector:
+        tfidf_model = joblib.load(f"nfs_server/SnipsModel-{model_id}/probabilistic_intent_parser/intent_classifier/tfidf.joblib")
+        x_tfidf = tfidf_model.transform([raw_utterance])
+
+        # Concatenate the two vectors:
+        x_csr = sparse.hstack([x_fasttext, x_tfidf])
 
         return x_csr
 
@@ -696,11 +709,20 @@ class FastTextVectorizer(ProcessingUnit):
         # Enrich utterances with builtin entities:
         utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
 
+
+        # TF-IDF embeddings:
+        from sklearn.feature_extraction.text import (TfidfVectorizer as SklearnTfidfVectorizer)
+        self._sklearn_tfidf_vectorizer = SklearnTfidfVectorizer()
+
+        # Transformed data:
+        x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(utterances)
+
         # Fit the FastText vectorizer => outputs dense Numpy array of arrays:
         x_fasttext = fast_model[utterances]
 
-        # Convert Numpy array to Scipy CSR sparse matrix:
-        x_csr = sparse.csr_matrix(x_fasttext)
+        # Merge FastText and TFIDF (converted to Numpy array to Scipy CSR sparse matrix):
+        import scipy.sparse as sp
+        x_csr = sp.hstack([x_fasttext, x_tfidf])
 
         return x_csr
 

@@ -27,14 +27,7 @@ logger = logging.getLogger(__name__)
 # in 0.19 and 0.20 will be None (which is equivalent to -infinity, so it has no
 # effect) but will change in 0.21 to 1e-3. Specify tol to silence this warning.
 
-LOG_REG_ARGS = {
-    "loss": "log",
-    "penalty": "l2",
-    "max_iter": 10000,
-    "tol": 1e-3,
-    "n_jobs": -1
-}
-
+DEBUG = False
 
 @IntentClassifier.register("random_forest_classifier")
 class RandForIntentClassifier(IntentClassifier):
@@ -91,16 +84,21 @@ class RandForIntentClassifier(IntentClassifier):
         if len(self.intent_list) <= 1:
             return self
 
+        # Instantiate the featurizer:
         self.featurizer = Featurizer(
-            config=self.config.featurizer_config,
-            builtin_entity_parser=self.builtin_entity_parser,
-            custom_entity_parser=self.custom_entity_parser,
-            resources=self.resources,
-            random_state=self.random_state,
-        )
+                                    config=self.config.featurizer_config,
+                                    builtin_entity_parser=self.builtin_entity_parser,
+                                    custom_entity_parser=self.custom_entity_parser,
+                                    resources=self.resources,
+                                    random_state=self.random_state,
+                                )
+        
+        # Set language:
         self.featurizer.language = language
 
         none_class = max(classes)
+
+        # Fit the featurizer:
         try:
             x = self.featurizer.fit_transform(dataset, utterances, classes, none_class)
 
@@ -109,6 +107,7 @@ class RandForIntentClassifier(IntentClassifier):
             self.featurizer = None
             return self
 
+        # Compute class weights:
         class_weights_arr = compute_class_weight("balanced", range(none_class + 1), classes)
 
         # Re-weight the noise class
@@ -117,6 +116,38 @@ class RandForIntentClassifier(IntentClassifier):
 
         # Instantiate the classifier:
         self.classifier = RandomForestClassifier(random_state=self.random_state, class_weight=class_weight)
+
+        # Dimensionality reduction for debugging visualizations:
+        if DEBUG:
+
+            # Import PCA from SKlearn:
+            from sklearn.decomposition import PCA
+            from sklearn.manifold import TSNE
+
+            # Instantiate PCA:
+            pca = PCA(n_components=2, random_state=self.random_state)
+
+            # Fit transform PCA:
+            self.pcad_x = pca.fit_transform(x.toarray())
+
+            # Fit transform TSNE for 3 values of Perplexity: 5, N**1/2, 50
+            self.tsned_x = {}
+            
+            # For each perplexity value in the following list:
+            for perplexity in [5, len(classes)**(1/2), 50]:
+
+                # Instantiate t-SNE with 2 dimensions:
+                tsne = TSNE(n_components=2,
+                            random_state=self.random_state,
+                            perplexity = perplexity
+                            )
+                
+                # Fit transform t-SNE and store the result in the tsned_x dict attribute:
+                tsned_x = tsne.fit_transform(x.toarray())
+                self.tsned_x[perplexity] = tsned_x
+
+            # Persist the classes:
+            self.classes = classes  
 
         # Fit the classifier:
         self.classifier.fit(x, classes)
@@ -244,6 +275,59 @@ class RandForIntentClassifier(IntentClassifier):
 
         # Persist the classifier:
         joblib.dump(self.classifier, str(path / "random_forest_model.joblib"), compress=3)
+
+        # Persist TF-IDF vectorizer:
+        joblib.dump(self.featurizer.vectorizer._sklearn_tfidf_vectorizer, str(path / "tfidf.joblib"), compress=3)
+
+        # t-SNE and PCA embeddings if debug mode is on:
+        if DEBUG:
+
+            # Use matplotlib to plot the t-SNE for each perplexity:
+            for perplexity in self.tsned_x.keys():
+                    
+                    import matplotlib.pyplot as plt
+
+                    # Instantiate a figure:
+                    fig = plt.figure(figsize=(8, 8))
+        
+                    # Plot the t-SNE:
+                    plt.scatter(self.tsned_x[perplexity][:, 0],
+                                self.tsned_x[perplexity][:, 1],
+                                c=self.classes,
+                                cmap=plt.cm.get_cmap("jet", len(self.intent_list)), s=10, alpha=0.7)
+        
+                    # Add a colorbar:
+                    cbar = plt.colorbar(ticks=range(len(self.intent_list)))
+                    cbar.ax.set_yticklabels(self.intent_list)
+        
+                    # Add a title:
+                    plt.title("t-SNE for perplexity = %s" % perplexity)
+
+                    # Save the figure:
+                    plt.savefig(str(path / ("tsne_perplexity_%s.png" % perplexity)))
+
+            # Plot PCA:
+            fig = plt.figure(figsize=(8, 8))
+            plt.scatter(self.pcad_x[:, 0],
+                        self.pcad_x[:, 1],
+                        c=self.classes,
+                        cmap=plt.cm.get_cmap("jet", len(self.intent_list)), s=10, alpha=0.7)
+            
+            # Add a colorbar:
+            cbar = plt.colorbar(ticks=range(len(self.intent_list)))
+            cbar.ax.set_yticklabels(self.intent_list)
+
+            # Add a title:
+            plt.title("PCA")
+
+            # Save the figure:
+            plt.savefig(str(path / "pca.png"))
+
+            # Persist the tsned_x dict:
+            joblib.dump(self.tsned_x, str(path / "tsned_x.joblib"), compress=3)
+
+            # Persist the classes:
+            joblib.dump(self.classes, str(path / "classes.joblib"), compress=3)
 
 
     @classmethod

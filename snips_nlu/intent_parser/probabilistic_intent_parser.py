@@ -63,6 +63,8 @@ class ProbabilisticIntentParser(IntentParser):
         logger.info("Fitting probabilistic intent parser...")
         dataset = validate_and_format_dataset(dataset)
         intents = list(dataset[INTENTS])
+
+        # Instantiate the intent classifier:
         if self.intent_classifier is None:
             self.intent_classifier = IntentClassifier.from_config(
                 self.config.intent_classifier_config,
@@ -72,13 +74,20 @@ class ProbabilisticIntentParser(IntentParser):
                 random_state=self.random_state,
             )
 
+        # Fit the classifier:
         if force_retrain or not self.intent_classifier.fitted:
+
+            # Fit the intent classifier that was set prior:
             self.intent_classifier.fit(dataset)
 
+        # Fit the slot fillers:
         if self.slot_fillers is None:
             self.slot_fillers = dict()
         slot_fillers_start = datetime.now()
+
+        # Fit the slot filler for each intent:
         for intent_name in intents:
+            
             # We need to copy the slot filler config as it may be mutated
             if self.slot_fillers.get(intent_name) is None:
                 slot_filler_config = deepcopy(self.config.slot_filler_config)
@@ -89,15 +98,16 @@ class ProbabilisticIntentParser(IntentParser):
                     resources=self.resources,
                     random_state=self.random_state,
                 )
+
+            # Fit the slot filler:
             if force_retrain or not self.slot_fillers[intent_name].fitted:
                 self.slot_fillers[intent_name].fit(dataset, intent_name)
-        logger.debug("Fitted slot fillers in %s",
-                     elapsed_since(slot_fillers_start))
+
+        logger.debug("Fitted slot fillers in %s", elapsed_since(slot_fillers_start))
+
         return self
 
     # pylint:enable=arguments-differ
-
-
     @log_result(logger, logging.DEBUG,"ProbabilisticIntentParser result -> {result}")
     @log_elapsed_time(logger, logging.DEBUG, "ProbabilisticIntentParser parsed in {elapsed_time}")
     @fitted_required
