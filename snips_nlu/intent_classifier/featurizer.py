@@ -671,10 +671,10 @@ class FastTextVectorizer(ProcessingUnit):
         x_fasttext = fast_model[raw_utterance]
 
         # Bot's model ID:
-        model_id = self.from_path(self.__class__.__bases__[0].by_name('model_id'))
+        model_id = self.__class__.__bases__[0].by_name('model_id')
 
         # Load the TF-IDF model and transform the input sentence into a vector:
-        tfidf_model = joblib.load(f"./nfs_server//SnipsModel-{model_id}/tfidf.joblib")
+        tfidf_model = joblib.load(f"nfs_server/SnipsModel-{model_id}/probabilistic_intent_parser/intent_classifier/tfidf.joblib")
         x_tfidf = tfidf_model.transform([raw_utterance])
 
         # Concatenate the two vectors:
