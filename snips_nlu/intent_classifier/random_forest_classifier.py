@@ -117,7 +117,15 @@ class RandForIntentClassifier(IntentClassifier):
         # Instantiate the classifier:
         self.classifier = RandomForestClassifier(random_state=self.random_state, class_weight=class_weight)
 
-        # Dimensionality reduction:
+        # t-SNE transform:
+        from sklearn.manifold import TSNE
+        self.tsne = TSNE(n_components=2, random_state=self.random_state, perplexity = 50)
+
+        x = self.tsne.fit_transform(x.toarray())
+
+
+
+        # Dimensionality reduction for debugging visualizations:
         if DEBUG:
 
             # Import PCA from SKlearn:
@@ -276,6 +284,9 @@ class RandForIntentClassifier(IntentClassifier):
         # Persist the classifier:
         joblib.dump(self.classifier, str(path / "random_forest_model.joblib"), compress=3)
 
+        # Persist t-SNE trained embeddings:
+        joblib.dump(self.tsne, str(path / "tsne.joblib"), compress=3)
+
 
         # t-SNE and PCA embeddings if debug mode is on:
         if DEBUG:
@@ -321,12 +332,11 @@ class RandForIntentClassifier(IntentClassifier):
             # Save the figure:
             plt.savefig(str(path / "pca.png"))
 
+            # Persist the tsned_x dict:
+            joblib.dump(self.tsned_x, str(path / "tsned_x.joblib"), compress=3)
 
-        # Persist the tsned_x dict:
-        joblib.dump(self.tsned_x, str(path / "tsned_x.joblib"), compress=3)
-
-        # Persist the classes:
-        joblib.dump(self.classes, str(path / "classes.joblib"), compress=3)
+            # Persist the classes:
+            joblib.dump(self.classes, str(path / "classes.joblib"), compress=3)
 
 
     @classmethod

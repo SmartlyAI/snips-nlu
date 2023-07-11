@@ -707,12 +707,9 @@ class FastTextVectorizer(ProcessingUnit):
         # Fit the FastText vectorizer => outputs dense Numpy array of arrays:
         x_fasttext = fast_model[utterances]
 
-        # Merge FastText and TFIDF:
+        # Merge FastText and TFIDF (converted to Numpy array to Scipy CSR sparse matrix):
         import scipy.sparse as sp
-        x_final = sp.hstack([x_fasttext, x_tfidf])
-
-        # Convert Numpy array to Scipy CSR sparse matrix:
-        x_csr = sparse.csr_matrix(x_final)   
+        x_csr = sp.hstack([x_fasttext, x_tfidf])
 
         return x_csr
 
