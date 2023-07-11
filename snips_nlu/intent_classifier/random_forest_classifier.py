@@ -229,9 +229,6 @@ class RandForIntentClassifier(IntentClassifier):
         # Transform the text into a vector of features:
         X = self.featurizer.transform([text_to_utterance(text)])
 
-        # Load trained t-SNE instance:
-        tsne = joblib.load(self.tsne_path)
-
         # pylint: enable=C0103
         proba_vec = self.classifier.predict_proba(X)
 
