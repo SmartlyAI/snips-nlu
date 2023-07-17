@@ -4,7 +4,7 @@ import json
 from builtins import str, zip
 from copy import deepcopy
 from pathlib import Path
-from scipy import sparse
+from scipy import sparse as sp
 import joblib
 
 from future.utils import iteritems
@@ -670,6 +670,10 @@ class FastTextVectorizer(ProcessingUnit):
         fast_model = self.from_path(self.__class__.__bases__[0].by_name('language'))
         x_fasttext = fast_model[raw_utterance]
 
+        # Convert to CSR sparse array:
+        x_csr = sp.csr_array(x_fasttext)
+        
+        '''
         # Bot's model ID:
         model_id = self.__class__.__bases__[0].by_name('model_id')
 
@@ -679,6 +683,7 @@ class FastTextVectorizer(ProcessingUnit):
 
         # Concatenate the two vectors:
         x_csr = sparse.hstack([x_fasttext, x_tfidf])
+        '''
 
         return x_csr
 
@@ -710,19 +715,19 @@ class FastTextVectorizer(ProcessingUnit):
         utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
 
 
-        # TF-IDF embeddings:
+        '''# TF-IDF embeddings:
         from sklearn.feature_extraction.text import (TfidfVectorizer as SklearnTfidfVectorizer)
         self._sklearn_tfidf_vectorizer = SklearnTfidfVectorizer()
 
         # Transformed data:
-        x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(utterances)
+        x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(utterances)'''
 
         # Fit the FastText vectorizer => outputs dense Numpy array of arrays:
         x_fasttext = fast_model[utterances]
 
         # Merge FastText and TFIDF (converted to Numpy array to Scipy CSR sparse matrix):
-        import scipy.sparse as sp
-        x_csr = sp.hstack([x_fasttext, x_tfidf])
+        
+        x_csr = sp.csr_matrix(x_fasttext)
 
         return x_csr
 

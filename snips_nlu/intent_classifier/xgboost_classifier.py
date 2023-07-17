@@ -273,7 +273,7 @@ class XGBoostIntentClassifier(IntentClassifier):
         joblib.dump(self.classifier, str(path / "xgboost_model.joblib"), compress=3)
 
         # Persist TF-IDF vectorizer:
-        joblib.dump(self.featurizer.vectorizer._sklearn_tfidf_vectorizer, str(path / "tfidf.joblib"), compress=3)
+        #joblib.dump(self.featurizer.vectorizer._sklearn_tfidf_vectorizer, str(path / "tfidf.joblib"), compress=3)
 
         # t-SNE and PCA embeddings if debug mode is on:
         if DEBUG:
