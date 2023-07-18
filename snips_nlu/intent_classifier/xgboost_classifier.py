@@ -226,7 +226,7 @@ class XGBoostIntentClassifier(IntentClassifier):
         X = self.featurizer.transform([text_to_utterance(text)])
 
         # pylint: enable=C0103
-        proba_vec = self.classifier.predict_proba(X)
+        proba_vec = self.classifier.predict_proba(X).astype("float64")
 
         logger.debug("%s", DifferedLoggingMessage(self.log_activation_weights, text, X))
 
