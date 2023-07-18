@@ -72,7 +72,7 @@ class XGBoostIntentClassifier(IntentClassifier):
 
             # Remove noise data when using FastText embeddings:
             self.resources['noise'] = ['noise_data_placeholder']
-            
+
 
         # Build training data:
         utterances, classes, intent_list = build_training_data(dataset, language, data_augmentation_config, self.resources, self.random_state)
@@ -108,7 +108,10 @@ class XGBoostIntentClassifier(IntentClassifier):
             return self
 
         # Instantiate the classifier:
-        self.classifier = XGBClassifier(n_estimators=100, objective='multi:softmax', n_jobs= os.cpu_count(), random_state=self.random_state)
+        self.classifier = XGBClassifier(n_estimators = 300,
+                                        objective ='multi:softmax',
+                                        n_jobs = os.cpu_count(),
+                                        random_state = self.random_state)
 
         # Dimensionality reduction for debugging visualizations:
         if DEBUG:
