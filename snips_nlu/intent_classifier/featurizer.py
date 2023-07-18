@@ -671,7 +671,7 @@ class FastTextVectorizer(ProcessingUnit):
         x_fasttext = fast_model[raw_utterance]
 
         # Convert to CSR sparse array:
-        x_csr = sp.csr_array(x_fasttext)
+        x_csr = sp.csr_matrix(x_fasttext)
         
         '''
         # Bot's model ID:

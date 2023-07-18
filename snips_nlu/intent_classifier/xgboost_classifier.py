@@ -5,6 +5,7 @@ import logging
 from builtins import range, str, zip
 from pathlib import Path
 import joblib
+import os
 
 from snips_nlu.common.log_utils import DifferedLoggingMessage, log_elapsed_time
 from snips_nlu.common.utils import check_persisted_path, fitted_required, json_string
@@ -18,6 +19,7 @@ from snips_nlu.pipeline.configs import XGBoostIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
 
 logger = logging.getLogger(__name__)
+DEBUG = False
 
 # We set tol to 1e-3 to silence the following warning with Python 2 (
 # scikit-learn 0.20):
@@ -27,7 +29,6 @@ logger = logging.getLogger(__name__)
 # in 0.19 and 0.20 will be None (which is equivalent to -infinity, so it has no
 # effect) but will change in 0.21 to 1e-3. Specify tol to silence this warning.
 
-DEBUG = False
 
 @IntentClassifier.register("xgboost_classifier")
 class XGBoostIntentClassifier(IntentClassifier):
@@ -56,7 +57,6 @@ class XGBoostIntentClassifier(IntentClassifier):
             :class:`XGBoostIntentClassifier`: The same instance, trained
         """
         from xgboost import XGBClassifier
-        from sklearn.utils import compute_class_weight
         
         logger.info("Fitting XGBoostIntentClassifier...")
         dataset = validate_and_format_dataset(dataset) 
@@ -110,7 +110,7 @@ class XGBoostIntentClassifier(IntentClassifier):
             return self
 
         # Instantiate the classifier:
-        self.classifier = XGBClassifier(objective='multi:softmax', random_state=self.random_state)
+        self.classifier = XGBClassifier(n_estimators=100, objective='multi:softmax', n_jobs= os.cpu_count(), random_state=self.random_state)
 
         # Dimensionality reduction for debugging visualizations:
         if DEBUG:
