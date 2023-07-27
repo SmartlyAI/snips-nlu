@@ -813,7 +813,175 @@ class FastTextVectorizer(ProcessingUnit):
     def language(self):
         # Create this getter to prevent the language from being set elsewhere than in the fit
         return self._language
+
+
+
+@ProcessingUnit.register("sbert_vectorizer")
+class SBERTVectorizer(ProcessingUnit):
+
+    config_type = VectorizerConfig
     
+
+    def __init__(self, config=None, **shared):
+        super(SBERTVectorizer, self).__init__(config, **shared)
+        self.sbert_vectorizer = None
+        self._language = None
+        self.builtin_entity_scope = None
+
+    # This is used for the parse (i.e. prediction time) after the model was already trained:
+    def transform(self, x):
+        
+        # Raw string of the input sentence:
+        raw_utterance = x[0]['data'][0]['text'].strip()
+
+        # Load the FastText model and transform the input sentence into a vector:
+        sbert_model = self.from_path(self.__class__.__bases__[0].by_name('language'))
+        x_sbert = sbert_model.encode(raw_utterance)
+
+        # Convert to CSR sparse array:
+        x_csr = sp.csr_matrix(x_sbert)
+        
+        '''
+        # Bot's model ID:
+        model_id = self.__class__.__bases__[0].by_name('model_id')
+
+        # Load the TF-IDF model and transform the input sentence into a vector:
+        tfidf_model = joblib.load(f"nfs_server/SnipsModel-{model_id}/probabilistic_intent_parser/intent_classifier/tfidf.joblib")
+        x_tfidf = tfidf_model.transform([raw_utterance])
+
+        # Concatenate the two vectors:
+        x_csr = sparse.hstack([x_fasttext, x_tfidf])
+        '''
+
+        return x_csr
+
+    
+    # Fit the FastText vectorizer:
+    def fit_transform(self, x, y, dataset):
+
+        # Instantiate TF-IDF:
+        self.sbert_vectorizer = SBERTVectorizer(config=self.config,
+                                                builtin_entity_parser=self.builtin_entity_parser,
+                                                custom_entity_parser=self.custom_entity_parser,
+                                                resources=self.resources,
+                                                random_state=self.random_state,
+                                                )
+        
+
+        # Fit entity parsers and get resources:
+        self.load_resources_if_needed(dataset[LANGUAGE])
+        self.fit_builtin_entity_parser_if_needed(dataset)
+        self.fit_custom_entity_parser_if_needed(dataset)
+        
+        # Set language:
+        self._language = dataset[LANGUAGE]
+        
+        # Initialize FastText model:
+        sbert_model = self.from_path(self._language) 
+
+        # Enrich utterances with builtin entities:
+        utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
+
+
+        '''# TF-IDF embeddings:
+        from sklearn.feature_extraction.text import (TfidfVectorizer as SklearnTfidfVectorizer)
+        self._sklearn_tfidf_vectorizer = SklearnTfidfVectorizer()
+
+        # Transformed data:
+        x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(utterances)'''
+
+        # Fit the FastText vectorizer => outputs dense Numpy array of arrays:
+        x_sbert = sbert_model[utterances]
+
+        # Merge FastText and TFIDF (converted to Numpy array to Scipy CSR sparse matrix):
+        
+        x_csr = sp.csr_matrix(x_sbert)
+
+        return x_csr
+
+    
+    def _preprocess(self, utterances):
+        normalized_utterances = deepcopy(utterances)
+        for u in normalized_utterances:
+            nb_chunks = len(u[DATA])
+            for i, chunk in enumerate(u[DATA]):
+                chunk[TEXT] = _normalize_stem(chunk[TEXT], self.language, self.resources, self.config.vectorizer_config.use_stemming)
+                if i < nb_chunks - 1:
+                    chunk[TEXT] += " "
+
+        # Extract builtin entities on unormalized utterances
+        builtin_ents = [
+            self.builtin_entity_parser.parse(
+                get_text_from_chunks(u[DATA]),
+                self.builtin_entity_scope, use_cache=True)
+            for u in utterances
+        ]
+        # Extract builtin entities on normalized utterances
+        custom_ents = [
+            self.custom_entity_parser.parse(
+                get_text_from_chunks(u[DATA]), use_cache=True)
+            for u in normalized_utterances
+        ]
+        if self.config.vectorizer_config.word_clusters_name:
+            # Extract world clusters on unormalized utterances
+            original_utterances_text = [get_text_from_chunks(u[DATA])
+                                        for u in utterances]
+            w_clusters = [
+                _get_word_cluster_features(
+                    tokenize_light(u.lower(), self.language),
+                    self.config.vectorizer_config.word_clusters_name,
+                    self.resources)
+                for u in original_utterances_text
+            ]
+        else:
+            w_clusters = [None for _ in normalized_utterances]
+
+        return normalized_utterances, builtin_ents, custom_ents, w_clusters
+
+
+    # Enriches the utterance with builtin entities, custom entities and word clusters:
+    def _enrich_utterance(self, utterance, builtin_entities, custom_entities,word_clusters):
+        
+        custom_entities_features = [_entity_name_to_feature(e[ENTITY_KIND], self.language) for e in custom_entities]
+
+        builtin_entities_features = [_builtin_entity_to_feature(ent[ENTITY_KIND], self.language) for ent in builtin_entities]
+
+        # We remove values of builtin slots from the utterance to avoid
+        # learning specific samples such as '42' or 'tomorrow'
+        filtered_tokens = [
+            chunk[TEXT] for chunk in utterance[DATA]
+            if ENTITY not in chunk or not is_builtin_entity(chunk[ENTITY])
+        ]
+
+        features = get_default_sep(self.language).join(filtered_tokens)
+
+        if builtin_entities_features:
+            features += " " + " ".join(sorted(builtin_entities_features))
+        if custom_entities_features:
+            features += " " + " ".join(sorted(custom_entities_features))
+        if word_clusters:
+            features += " " + " ".join(sorted(word_clusters))
+
+        return features
+
+    def from_path(self, lang, path=None, **shared):
+        from sentence_transformers import SentenceTransformer
+        return SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
+
+
+    # Doesn't need to be persisted (pre-trained model) => pass because it's an abstract method:    
+    def persist(self, path):
+        pass
+
+    # SBERT is pre-trained, so it's always fitted (i.e. always True):
+    def fitted(self):
+        return True
+    
+    @property
+    def language(self):
+        # Create this getter to prevent the language from being set elsewhere than in the fit
+        return self._language
+
 
 @ProcessingUnit.register("cooccurrence_vectorizer")
 class CooccurrenceVectorizer(ProcessingUnit):
