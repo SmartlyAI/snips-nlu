@@ -820,7 +820,6 @@ class FastTextVectorizer(ProcessingUnit):
 class SBERTVectorizer(ProcessingUnit):
 
     config_type = VectorizerConfig
-    
 
     def __init__(self, config=None, **shared):
         super(SBERTVectorizer, self).__init__(config, **shared)
@@ -882,7 +881,6 @@ class SBERTVectorizer(ProcessingUnit):
         # Enrich utterances with builtin entities:
         utterances = [self._enrich_utterance(*data) for data in zip(*self._preprocess(x))]
 
-
         '''# TF-IDF embeddings:
         from sklearn.feature_extraction.text import (TfidfVectorizer as SklearnTfidfVectorizer)
         self._sklearn_tfidf_vectorizer = SklearnTfidfVectorizer()
@@ -890,11 +888,10 @@ class SBERTVectorizer(ProcessingUnit):
         # Transformed data:
         x_tfidf = self._sklearn_tfidf_vectorizer.fit_transform(utterances)'''
 
-        # Fit the FastText vectorizer => outputs dense Numpy array of arrays:
-        x_sbert = sbert_model[utterances]
+        # Fit the SBERT vectorizer => outputs dense Numpy array of arrays:
+        x_sbert = sbert_model.encode(utterances)
 
-        # Merge FastText and TFIDF (converted to Numpy array to Scipy CSR sparse matrix):
-        
+        # Converted Numpy dense array to Scipy CSR sparse matrix:
         x_csr = sp.csr_matrix(x_sbert)
 
         return x_csr
@@ -1238,6 +1235,10 @@ def VectorizerFactory(vectorizer_name, featurizer_config):
     
     elif vectorizer_name == 'fasttext_vectorizer':
         return FastTextVectorizer(featurizer_config)
+    
+    elif vectorizer_name == 'sbert_vectorizer':
+        return SBERTVectorizer(featurizer_config)
+    
 
 def _entity_name_to_feature(entity_name, language):
     return "entityfeature%s" % "".join(tokenize_light(entity_name.lower(), language))
