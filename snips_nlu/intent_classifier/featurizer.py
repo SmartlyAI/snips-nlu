@@ -268,6 +268,10 @@ class Featurizer(ProcessingUnit):
         elif vectorizer_name == "fasttext_vectorizer":
             return FastTextVectorizer()
         
+        # SBERT:
+        elif vectorizer_name == "sbert_vectorizer":
+            return SBERTVectorizer()        
+        
         # Raise error if unknown vectorizer:
         else:
             raise ValueError("Unknown vectorizer: %s" % vectorizer_name)
