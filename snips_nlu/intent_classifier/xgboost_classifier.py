@@ -14,11 +14,10 @@ from snips_nlu.dataset import validate_and_format_dataset
 from snips_nlu.exceptions import LoadingError, _EmptyDatasetUtterancesError
 from snips_nlu.intent_classifier.featurizer import Featurizer
 from snips_nlu.intent_classifier.intent_classifier import IntentClassifier
-from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, get_regularization_factor, text_to_utterance
+from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, text_to_utterance
 from snips_nlu.pipeline.configs import XGBoostIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
 import numpy as np
-import pandas as pd
 from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
 from sklearn.metrics import f1_score, make_scorer
 
