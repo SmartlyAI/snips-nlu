@@ -17,9 +17,14 @@ from snips_nlu.intent_classifier.intent_classifier import IntentClassifier
 from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, get_regularization_factor, text_to_utterance
 from snips_nlu.pipeline.configs import XGBoostIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
+from sklearn.metrics import f1_score, make_scorer
 
 logger = logging.getLogger(__name__)
 DEBUG = False
+TUNING = True
 
 # We set tol to 1e-3 to silence the following warning with Python 2 (
 # scikit-learn 0.20):
@@ -108,7 +113,7 @@ class XGBoostIntentClassifier(IntentClassifier):
             return self
 
         # Instantiate the classifier:
-        self.classifier = XGBClassifier(n_estimators = 300,
+        self.classifier = XGBClassifier(n_estimators = 100,
                                         objective ='multi:softmax',
                                         n_jobs = os.cpu_count(),
                                         random_state = self.random_state)
@@ -145,8 +150,74 @@ class XGBoostIntentClassifier(IntentClassifier):
             # Persist the classes:
             self.classes = classes  
 
-        # Fit the classifier:
-        self.classifier.fit(x, classes)
+        # If hyperparameter tuning is disabled:
+        if not TUNING:
+
+            # Fit the classifier normally:
+            self.classifier.fit(x, classes)
+
+
+        # If tuning is enabled:
+        else:
+
+            # Split data 80/20 stratified by classes:
+            X_train_val, y_train_val = train_test_split(x, classes, test_size=0.2, stratify=classes, random_state=42)
+
+            # Step 2: Define the hyperparameter grid for tuning, including the default parameters
+            hyperparameter_grid = {
+                                    'learning_rate': [0.01, 0.05, 0.1, 0.2, 0.3],  # Include the default learning_rate
+                                    'max_depth': [3, 5, 7, 9, 10],  # Include the default max_depth
+                                    'min_child_weight': [1, 3, 5, 7],  # Include the default min_child_weight
+                                    'subsample': [0.5, 0.8, 0.9, 1.0,],  # Include the default subsample
+                                    'colsample_bytree': [0.5, 0.8, 0.9, 1.0],  # Include the default colsample_bytree
+                                    'gamma': [0, 0.1, 0.2, 0.3,],  # Include the default gamma
+                                    'reg_alpha': [0, 0.1, 0.5, 1],  # Include the default reg_alpha
+                                    'reg_lambda': [0, 0.1, 0.5, 1],  # Include the default reg_lambda
+                                    'n_estimators': [50, 100, 200, 300]  # Include the default n_estimators
+                                    }
+
+            # Candidate classifier model:
+            xgb_candidate_model = XGBClassifier(objective='multi:softmax',
+                                                num_class=np.max(classes) + 1,
+                                                booster='gbtree',
+                                                seed=42)
+
+            # Number of random parameter settings that are sampled
+            N_ITER_SEARCH = 20
+
+            # Number of folds for cross validation:
+            FOLDS = 5
+
+            # Instaniate F-1 scorer:
+            f1_scorer = make_scorer(f1_score, average='weighted')
+
+            # Stratified K-Fold cross-validation:
+            strat_kfold = StratifiedKFold(n_splits = FOLDS, shuffle = True, random_state=42)
+
+            # Randomized cross-validated search:
+            random_search = RandomizedSearchCV(xgb_candidate_model,
+                                               param_distributions = hyperparameter_grid,
+                                               n_iter = N_ITER_SEARCH,
+                                               cv = strat_kfold,
+                                               scoring = f1_scorer,
+                                               random_state = 42)
+
+            # Run the cross-validation search:
+            random_search.fit(X_train_val, y_train_val)
+
+            # Get the best hyperparameters from the search
+            best_params = random_search.best_params_
+
+            # Train the final model on the combined train and validation sets with the best hyperparameters
+            self.classifier = XGBClassifier(objective='multi:softmax',
+                                            num_class=np.max(classes) + 1,
+                                            seed=42,
+                                            booster='gbtree',
+                                            **best_params
+                                            )
+            
+            # Fit the final model using the best hyperparameters:
+            self.classifier.fit(x, classes)
 
         logger.debug("%s", DifferedLoggingMessage(self.log_best_features))
         return self
