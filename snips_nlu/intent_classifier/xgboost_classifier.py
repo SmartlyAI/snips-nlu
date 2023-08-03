@@ -160,7 +160,7 @@ class XGBoostIntentClassifier(IntentClassifier):
         else:
 
             # Split data 80/20 stratified by classes:
-            X_train_val, y_train_val = train_test_split(x, classes, test_size=0.2, stratify=classes, random_state=42)
+            X_train_val, y_train_val = train_test_split(x, test_size=0.2, stratify=classes, random_state=42)
 
             # Step 2: Define the hyperparameter grid for tuning, including the default parameters
             hyperparameter_grid = {
