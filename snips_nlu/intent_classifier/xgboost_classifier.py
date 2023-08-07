@@ -23,7 +23,7 @@ from sklearn.metrics import f1_score, make_scorer
 
 logger = logging.getLogger(__name__)
 DEBUG = False
-TUNING = True
+TUNING = False
 
 # We set tol to 1e-3 to silence the following warning with Python 2 (
 # scikit-learn 0.20):
