@@ -111,12 +111,6 @@ class XGBoostIntentClassifier(IntentClassifier):
             self.featurizer = None
             return self
 
-        # Instantiate the classifier:
-        self.classifier = XGBClassifier(n_estimators = 100,
-                                        objective ='multi:softmax',
-                                        n_jobs = os.cpu_count(),
-                                        random_state = self.random_state)
-
         # Dimensionality reduction for debugging visualizations:
         if DEBUG:
 
@@ -151,6 +145,14 @@ class XGBoostIntentClassifier(IntentClassifier):
 
         # If hyperparameter tuning is disabled:
         if not TUNING:
+             
+            # Instantiate the classifier:
+            self.classifier = XGBClassifier(n_estimators = 100,
+                                        objective ='multi:softmax',
+                                        n_jobs = os.cpu_count(),
+                                        booster='gbtree',
+                                        tree_method = 'hist',
+                                        random_state = self.random_state)
 
             # Fit the classifier normally:
             self.classifier.fit(x, classes)
@@ -179,7 +181,8 @@ class XGBoostIntentClassifier(IntentClassifier):
             xgb_candidate_model = XGBClassifier(objective='multi:softmax',
                                                 num_class=np.max(classes) + 1,
                                                 booster='gbtree',
-                                                seed=42)
+                                                tree_method='hist',
+                                                seed=self.random_state)
 
             # Number of random parameter settings that are sampled
             N_ITER_SEARCH = 20
@@ -212,6 +215,7 @@ class XGBoostIntentClassifier(IntentClassifier):
                                             num_class=np.max(classes) + 1,
                                             seed=42,
                                             booster='gbtree',
+                                            tree_method='hist',
                                             **best_params
                                             )
             
