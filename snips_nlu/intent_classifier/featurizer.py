@@ -966,6 +966,8 @@ class SBERTVectorizer(ProcessingUnit):
         return features
 
     def from_path(self, lang, path=None, **shared):
+        import sys, os
+        sys.path.append(f"{os.getcwd()}/nfs_server/extra_libs")
         from sentence_transformers import SentenceTransformer
         return SentenceTransformer('sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2')
 
