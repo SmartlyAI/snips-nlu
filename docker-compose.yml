@@ -199,7 +199,7 @@ services:
       - SNIPS_HOST=0.0.0.0
       - SNIPS_PORT=4200
       - RABBITMQ_URL
-      - NSF_SERVER_PATH=/snips_parse/nfs_server
+      - NFS_SERVER_PATH=/snips_parse/nfs_server
     networks:
       - snips_nlu_network
     deploy:
@@ -209,7 +209,7 @@ services:
         constraints: [node.labels.type == parsemodelarabe]
       restart_policy:
         condition: any
-    command: ["gunicorn", "-b 0.0.0.0:4200", "--reload", "run_parse:smartly_parse_app"]
+    command: bash -c "export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.8/site-packages && gunicorn -b 0.0.0.0:4200 --reload --timeout 0 run_parse:smartly_parse_app"
   train106:
     image: 127.0.0.1:5000/snips_train_106
     build: 
@@ -226,7 +226,7 @@ services:
       - SNIPS_PORT=4300
       - RABBITMQ_URL
       - SSE_REDIS_URL=redis://redis:6379/0
-      - NSF_SERVER_PATH=/snips_train/nfs_server
+      - NFS_SERVER_PATH=/snips_train/nfs_server
     networks:
       - snips_nlu_network
     deploy:
@@ -236,4 +236,4 @@ services:
         constraints: [node.labels.type == train]
       restart_policy:
         condition: any
-    command: ["gunicorn", "-b 0.0.0.0:4300", "--reload", "run_train:smartly_train_app"]
+    command: bash -c "rm -rf /snips_train/nfs_server/shared_libs && mv /snips_train/shared_libs /snips_train/nfs_server/ && export PYTHONPATH=$PYTHONPATH:/usr/local/lib/python3.8/site-packages/ && gunicorn -b 0.0.0.0:4300 --reload run_train:smartly_train_app --log-level DEBUG --timeout 0"
