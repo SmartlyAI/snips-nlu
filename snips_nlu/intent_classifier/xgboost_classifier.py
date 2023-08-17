@@ -161,66 +161,93 @@ class XGBoostIntentClassifier(IntentClassifier):
         # If tuning is enabled:
         else:
 
-            # Split data 80/20 stratified by classes:
-            X_train_val, y_train_val = train_test_split(x, test_size=0.2, stratify=classes, random_state=42)
 
-            # Step 2: Define the hyperparameter grid for tuning, including the default parameters
-            hyperparameter_grid = {
-                                    'learning_rate': [0.01, 0.05, 0.1, 0.2, 0.3],  # Include the default learning_rate
-                                    'max_depth': [3, 5, 7, 9, 10],  # Include the default max_depth
-                                    'min_child_weight': [1, 3, 5, 7],  # Include the default min_child_weight
-                                    'subsample': [0.5, 0.8, 0.9, 1.0,],  # Include the default subsample
-                                    'colsample_bytree': [0.5, 0.8, 0.9, 1.0],  # Include the default colsample_bytree
-                                    'gamma': [0, 0.1, 0.2, 0.3,],  # Include the default gamma
-                                    'reg_alpha': [0, 0.1, 0.5, 1],  # Include the default reg_alpha
-                                    'reg_lambda': [0, 0.1, 0.5, 1],  # Include the default reg_lambda
-                                    'n_estimators': [50, 100, 200, 300]  # Include the default n_estimators
-                                    }
-
-            # Candidate classifier model:
-            xgb_candidate_model = XGBClassifier(objective='multi:softmax',
-                                                num_class=np.max(classes) + 1,
-                                                booster='gbtree',
-                                                tree_method='hist',
-                                                seed=self.random_state)
-
-            # Number of random parameter settings that are sampled
-            N_ITER_SEARCH = 20
-
-            # Number of folds for cross validation:
-            FOLDS = 5
-
-            # Instaniate F-1 scorer:
-            f1_scorer = make_scorer(f1_score, average='weighted')
-
-            # Stratified K-Fold cross-validation:
-            strat_kfold = StratifiedKFold(n_splits = FOLDS, shuffle = True, random_state=42)
-
-            # Randomized cross-validated search:
-            random_search = RandomizedSearchCV(xgb_candidate_model,
-                                               param_distributions = hyperparameter_grid,
-                                               n_iter = N_ITER_SEARCH,
-                                               cv = strat_kfold,
-                                               scoring = f1_scorer,
-                                               random_state = 42)
-
-            # Run the cross-validation search:
-            random_search.fit(X_train_val, y_train_val)
-
-            # Get the best hyperparameters from the search
-            best_params = random_search.best_params_
-
-            # Train the final model on the combined train and validation sets with the best hyperparameters
-            self.classifier = XGBClassifier(objective='multi:softmax',
-                                            num_class=np.max(classes) + 1,
-                                            seed=42,
-                                            booster='gbtree',
-                                            tree_method='hist',
-                                            **best_params
-                                            )
+            import optuna
+            from sklearn.model_selection import StratifiedKFold
+            from xgboost import cv
+            import optuna.integration.xgboost as xgb_integration
+            from sklearn.metrics import f1_score
             
-            # Fit the final model using the best hyperparameters:
-            self.classifier.fit(x, classes)
+
+            def objective(trial):
+
+                # Define hyperparameter search space
+                params = {
+                    'n_estimators': trial.suggest_int('n_estimators', 50, 300),
+                    'learning_rate': trial.suggest_float('learning_rate', 0.001, 1.0, log=True),
+                    'max_depth': trial.suggest_int('max_depth', 3, 10),
+                    'min_child_weight': trial.suggest_int('min_child_weight', 1, 10),
+                    'subsample': trial.suggest_float('subsample', 0.1, 1.0),
+                    'colsample_bytree': trial.suggest_float('colsample_bytree', 0.1, 1.0),
+                    'reg_alpha': trial.suggest_float('reg_alpha', 0.01, 10.0, log=True),
+                    'reg_lambda': trial.suggest_float('reg_lambda', 0.01, 10.0, log=True),
+                    'gamma': trial.suggest_float('gamma', 0.01, 10.0, log=True)
+                }
+
+                
+                # Initialize the classifier with suggested hyperparameters
+                clf = XGBClassifier(**params,
+                                    objective ='multi:softmax',
+                                    n_jobs = os.cpu_count(),
+                                    booster='gbtree',
+                                    tree_method = 'hist',
+                                    random_state = self.random_state)
+                
+                # Custom weighted F1 score metric for multiclass classification
+                def weighted_f1_score(preds, dtrain):
+                    y_true = dtrain.get_label()
+                    y_pred = np.argmax(preds, axis=1)
+                    f1 = f1_score(y_true, y_pred, average='weighted')
+                    return 'weighted-f1-score', f1
+                
+                # Stratified Cross-Validation using xgb.cv() with XGBoostPruningCallback
+                pruning_callback = xgb_integration.XGBoostPruningCallback(trial, 'test-weighted-f1-score-mean')
+
+                strat_folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
+
+                cv_results = cv(params,
+                                dtrain = xgb_integration.DMatrix(x, label=classes),
+                                num_boost_round = 100,
+                                folds = strat_folds,
+                                early_stopping_rounds = 10,
+                                maximize = True,
+                                custom_metric = weighted_f1_score,
+                                callbacks = [pruning_callback],
+                                verbose_eval = False)
+                
+                # Use the mean value across all folds as the objective:
+                return np.mean(cv_results['test-weighted-f1-score-mean'])
+
+            # Define Optuna study
+            study = optuna.create_study(direction = 'maximize', pruner = optuna.pruners.HyperbandPruner())
+
+            # Start optimization process:
+            study.optimize(objective, n_trials = 100,
+                           n_jobs = os.cpu_count(),
+                           show_progress_bar=True)
+
+            # Get the best parameters
+            best_params = study.best_params
+
+            # Print the best hyperparameters and score
+            best_trial = study.best_trial
+            print('Best trial:')
+            print('Value: {}'.format(best_trial.value))
+            print('Params: ')
+            for key, value in best_trial.params.items():
+                print('    {}: {}'.format(key, value))
+
+
+            # Retrain XGBClassifier on the whole dataset with the best parameters:
+            best_xgb = XGBClassifier(**best_params,
+                                    objective ='multi:softmax',
+                                    n_jobs = os.cpu_count(),
+                                    booster='gbtree',
+                                    tree_method = 'hist',
+                                    random_state = self.random_state)
+            
+            # Fit final model:
+            best_xgb.fit(x, classes)
 
         logger.debug("%s", DifferedLoggingMessage(self.log_best_features))
         return self
