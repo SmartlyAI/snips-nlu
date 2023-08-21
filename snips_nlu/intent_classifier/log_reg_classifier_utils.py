@@ -146,15 +146,14 @@ def build_training_data(dataset, language, data_augmentation_config, resources,r
         min_utterances_to_generate = max(data_augmentation_config.min_utterances, nb_utterances)
 
         # Original utterances + augmented ones:
-        utterances = augment_utterances(
-            dataset,
-            intent_name,
-            language=language,
-            min_utterances=min_utterances_to_generate,
-            capitalization_ratio = 0.0,
-            add_builtin_entities_examples = data_augmentation_config.add_builtin_entities_examples,
-            resources=resources,
-            random_state=random_state)
+        utterances = augment_utterances(dataset,
+                                        intent_name,
+                                        language=language,
+                                        min_utterances=min_utterances_to_generate,
+                                        capitalization_ratio = 0.0,
+                                        add_builtin_entities_examples = data_augmentation_config.add_builtin_entities_examples,
+                                        resources=resources,
+                                        random_state=random_state)
 
         # Append final utterances:
         augmented_utterances += utterances
@@ -163,7 +162,7 @@ def build_training_data(dataset, language, data_augmentation_config, resources,r
         utterance_classes += [classes_mapping[intent_name] for _ in range(len(utterances))]
 
 
-    # Skipped by default:
+    #! Skipped by default:
     if data_augmentation_config.unknown_words_replacement_string is not None:
         augmented_utterances = add_unknown_word_to_utterances(
             augmented_utterances,
@@ -173,8 +172,7 @@ def build_training_data(dataset, language, data_augmentation_config, resources,r
             random_state
         )
 
-    # Adding noise
-    # List of noise utterances from noise.txt file:
+    # Adding noise: list of noise utterances from noise.txt file:
     noise = get_noise(resources)
 
     # Dynamically remove dataset utterances from noise utterances:

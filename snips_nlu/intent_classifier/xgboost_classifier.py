@@ -18,12 +18,10 @@ from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_
 from snips_nlu.pipeline.configs import XGBoostIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
 import numpy as np
-from sklearn.model_selection import train_test_split, StratifiedKFold, RandomizedSearchCV
-from sklearn.metrics import f1_score, make_scorer
 
 logger = logging.getLogger(__name__)
 DEBUG = False
-TUNING = False
+TUNING = True
 
 # We set tol to 1e-3 to silence the following warning with Python 2 (
 # scikit-learn 0.20):
@@ -79,7 +77,11 @@ class XGBoostIntentClassifier(IntentClassifier):
 
 
         # Build training data:
-        utterances, classes, intent_list = build_training_data(dataset, language, data_augmentation_config, self.resources, self.random_state)
+        utterances, classes, intent_list = build_training_data(dataset,
+                                                               language,
+                                                               data_augmentation_config,
+                                                               self.resources,
+                                                               self.random_state)
 
         # Store intent list:
         self.intent_list = intent_list
@@ -147,32 +149,37 @@ class XGBoostIntentClassifier(IntentClassifier):
         if not TUNING:
              
             # Instantiate the classifier:
-            self.classifier = XGBClassifier(n_estimators = 100,
-                                        objective ='multi:softmax',
+            self.classifier = XGBClassifier(
+                                        n_estimators = 100,
+                                        objective = 'multi:softmax',
                                         n_jobs = os.cpu_count(),
-                                        booster='gbtree',
+                                        booster = 'gbtree',
                                         tree_method = 'hist',
                                         random_state = self.random_state)
 
             # Fit the classifier normally:
             self.classifier.fit(x, classes)
 
-
         # If tuning is enabled:
         else:
 
-
             import optuna
+            import gc
             from sklearn.model_selection import StratifiedKFold
-            from xgboost import cv
+            from xgboost import cv, DMatrix
             import optuna.integration.xgboost as xgb_integration
             from sklearn.metrics import f1_score
-            
 
             def objective(trial):
 
                 # Define hyperparameter search space
                 params = {
+                    'objective':'multi:softprob',
+                    'booster':'gbtree',
+                    'tree_method' : 'hist',
+                    'n_jobs': os.cpu_count(),
+                    'num_class' : len(classes),
+                    'random_state': self.random_state,
                     'n_estimators': trial.suggest_int('n_estimators', 50, 300),
                     'learning_rate': trial.suggest_float('learning_rate', 0.001, 1.0, log=True),
                     'max_depth': trial.suggest_int('max_depth', 3, 10),
@@ -184,47 +191,46 @@ class XGBoostIntentClassifier(IntentClassifier):
                     'gamma': trial.suggest_float('gamma', 0.01, 10.0, log=True)
                 }
 
-                
-                # Initialize the classifier with suggested hyperparameters
-                clf = XGBClassifier(**params,
-                                    objective ='multi:softmax',
-                                    n_jobs = os.cpu_count(),
-                                    booster='gbtree',
-                                    tree_method = 'hist',
-                                    random_state = self.random_state)
-                
                 # Custom weighted F1 score metric for multiclass classification
                 def weighted_f1_score(preds, dtrain):
                     y_true = dtrain.get_label()
                     y_pred = np.argmax(preds, axis=1)
-                    f1 = f1_score(y_true, y_pred, average='weighted')
+                    f1 = f1_score(y_true, y_pred, average = 'weighted')
                     return 'weighted-f1-score', f1
-                
-                # Stratified Cross-Validation using xgb.cv() with XGBoostPruningCallback
-                pruning_callback = xgb_integration.XGBoostPruningCallback(trial, 'test-weighted-f1-score-mean')
 
+                # Stratified Cross-Validation using xgb.cv() with XGBoostPruningCallback
+                pruning_callback = xgb_integration.XGBoostPruningCallback(trial, 'test-weighted-f1-score')
+
+                # Create stratified folds:
                 strat_folds = StratifiedKFold(n_splits=5, shuffle=True, random_state=42)
 
+                # Run cross validation:
                 cv_results = cv(params,
-                                dtrain = xgb_integration.DMatrix(x, label=classes),
+                                dtrain = DMatrix(x, label=classes),
                                 num_boost_round = 100,
                                 folds = strat_folds,
                                 early_stopping_rounds = 10,
                                 maximize = True,
                                 custom_metric = weighted_f1_score,
                                 callbacks = [pruning_callback],
+                                seed = self.random_state,
                                 verbose_eval = False)
+
+                # Garbabe collect:
+                gc.collect()
                 
                 # Use the mean value across all folds as the objective:
                 return np.mean(cv_results['test-weighted-f1-score-mean'])
 
             # Define Optuna study
-            study = optuna.create_study(direction = 'maximize', pruner = optuna.pruners.HyperbandPruner())
+            study = optuna.create_study(direction = 'maximize',
+                                        pruner = optuna.pruners.HyperbandPruner())
 
             # Start optimization process:
-            study.optimize(objective, n_trials = 100,
+            study.optimize(objective,
+                           n_trials = 100,
                            n_jobs = os.cpu_count(),
-                           show_progress_bar=True)
+                           show_progress_bar = True)
 
             # Get the best parameters
             best_params = study.best_params
@@ -237,9 +243,9 @@ class XGBoostIntentClassifier(IntentClassifier):
             for key, value in best_trial.params.items():
                 print('    {}: {}'.format(key, value))
 
-
             # Retrain XGBClassifier on the whole dataset with the best parameters:
-            best_xgb = XGBClassifier(**best_params,
+            best_params.pop('objective')
+            self.classifier = XGBClassifier(**best_params,
                                     objective ='multi:softmax',
                                     n_jobs = os.cpu_count(),
                                     booster='gbtree',
@@ -247,7 +253,7 @@ class XGBoostIntentClassifier(IntentClassifier):
                                     random_state = self.random_state)
             
             # Fit final model:
-            best_xgb.fit(x, classes)
+            self.classifier.fit(x, classes)
 
         logger.debug("%s", DifferedLoggingMessage(self.log_best_features))
         return self
