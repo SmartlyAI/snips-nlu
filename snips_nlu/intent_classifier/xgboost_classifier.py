@@ -179,7 +179,7 @@ class XGBoostIntentClassifier(IntentClassifier):
                     'tree_method' : 'hist',
                     'n_jobs': os.cpu_count(),
                     'num_class' : len(classes),
-                    'random_state': self.random_state,
+                    'random_state': 42,
                     'n_estimators': trial.suggest_int('n_estimators', 50, 300),
                     'learning_rate': trial.suggest_float('learning_rate', 0.001, 1.0, log=True),
                     'max_depth': trial.suggest_int('max_depth', 3, 10),
@@ -213,7 +213,7 @@ class XGBoostIntentClassifier(IntentClassifier):
                                 maximize = True,
                                 custom_metric = weighted_f1_score,
                                 callbacks = [pruning_callback],
-                                seed = self.random_state,
+                                seed = 42,
                                 verbose_eval = False)
 
                 # Garbabe collect:
