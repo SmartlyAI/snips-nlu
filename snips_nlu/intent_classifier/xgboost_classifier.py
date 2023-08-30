@@ -164,7 +164,6 @@ class XGBoostIntentClassifier(IntentClassifier):
         else:
 
             import optuna
-            import gc
             from sklearn.model_selection import StratifiedKFold
             from xgboost import cv, DMatrix
             import optuna.integration.xgboost as xgb_integration
@@ -177,7 +176,7 @@ class XGBoostIntentClassifier(IntentClassifier):
                     'objective':'multi:softprob',
                     'booster':'gbtree',
                     'tree_method' : 'hist',
-                    'n_jobs': os.cpu_count(),
+                    'n_jobs': 1,
                     'num_class' : len(classes),
                     'random_state': 42,
                     'n_estimators': trial.suggest_int('n_estimators', 50, 300),
@@ -216,9 +215,7 @@ class XGBoostIntentClassifier(IntentClassifier):
                                 seed = 42,
                                 verbose_eval = False)
 
-                # Garbabe collect:
-                gc.collect()
-                
+
                 # Use the mean value across all folds as the objective:
                 return np.mean(cv_results['test-weighted-f1-score-mean'])
 
@@ -229,8 +226,9 @@ class XGBoostIntentClassifier(IntentClassifier):
             # Start optimization process:
             study.optimize(objective,
                            n_trials = 100,
-                           n_jobs = os.cpu_count(),
-                           show_progress_bar = True)
+                           n_jobs = os.cpu_count()-2,
+                           show_progress_bar = True,
+                           gc_after_trial = True)
 
             # Get the best parameters
             best_params = study.best_params
@@ -244,7 +242,6 @@ class XGBoostIntentClassifier(IntentClassifier):
                 print('    {}: {}'.format(key, value))
 
             # Retrain XGBClassifier on the whole dataset with the best parameters:
-            best_params.pop('objective')
             self.classifier = XGBClassifier(**best_params,
                                     objective ='multi:softmax',
                                     n_jobs = os.cpu_count(),
