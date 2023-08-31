@@ -226,7 +226,7 @@ class XGBoostIntentClassifier(IntentClassifier):
             # Start optimization process:
             study.optimize(objective,
                            n_trials = 100,
-                           n_jobs = os.cpu_count()-2,
+                           n_jobs = max(os.cpu_count()-2, 2),
                            show_progress_bar = True,
                            gc_after_trial = True)
 
