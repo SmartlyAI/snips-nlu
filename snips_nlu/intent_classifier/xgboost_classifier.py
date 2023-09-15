@@ -21,7 +21,7 @@ import numpy as np
 
 logger = logging.getLogger(__name__)
 DEBUG = False
-TUNING = True
+TUNING = False
 
 # We set tol to 1e-3 to silence the following warning with Python 2 (
 # scikit-learn 0.20):
@@ -150,11 +150,13 @@ class XGBoostIntentClassifier(IntentClassifier):
              
             # Instantiate the classifier:
             self.classifier = XGBClassifier(
-                                        n_estimators = 100,
+                                        n_estimators = 150,
                                         objective = 'multi:softmax',
                                         n_jobs = os.cpu_count(),
                                         booster = 'gbtree',
                                         tree_method = 'hist',
+                                        early_stopping_rounds = None,
+                                        learning_rate = 0.01,
                                         random_state = self.random_state)
 
             # Fit the classifier normally:
@@ -258,7 +260,7 @@ class XGBoostIntentClassifier(IntentClassifier):
 
     # Get best intent => uses get_intents to get top best intents and then takes the first one:
     @fitted_required
-    def get_intent(self, text, intents_filter=None):
+    def get_intent(self, text, intents_filter=None): 
         """Performs intent classification on the provided *text*
 
         Args:

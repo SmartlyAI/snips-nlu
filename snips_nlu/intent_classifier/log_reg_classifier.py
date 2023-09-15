@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 LOG_REG_ARGS = {
     "loss": "log",
     "penalty": "l2",
-    "max_iter": 10000,
+    "max_iter": 1000,
     "tol": 1e-3,
     "n_jobs": -1
 }
