@@ -128,7 +128,7 @@ class LogRegIntentClassifier(IntentClassifier):
         # Re-weight the noise class => give it a more important weight => multiplies prior weight by a factor
         class_weights_arr[-1] *= self.config.noise_reweight_factor
 
-        # Format weights in a dictionary to be consistent with SKlearn:
+        # Format weights in a dictionary to be consistent with SGDClassifier's class_weight argument:
         class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
 
         # Fit logistic regression:

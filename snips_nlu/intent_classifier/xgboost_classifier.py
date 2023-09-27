@@ -17,6 +17,8 @@ from snips_nlu.intent_classifier.intent_classifier import IntentClassifier
 from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, text_to_utterance
 from snips_nlu.pipeline.configs import XGBoostIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
+from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 
 logger = logging.getLogger(__name__)
@@ -69,13 +71,6 @@ class XGBoostIntentClassifier(IntentClassifier):
         
         data_augmentation_config = self.config.data_augmentation_config
               
-        # Remove noise data when using FastText embeddings:
-        if self.config.featurizer_config.vectorizer_config.unit_name == 'fasttext_vectorizer':
-
-            # Remove noise data when using FastText embeddings:
-            self.resources['noise'] = ['noise_data_placeholder']
-
-
         # Build training data:
         utterances, classes, intent_list = build_training_data(dataset,
                                                                language,
@@ -149,7 +144,11 @@ class XGBoostIntentClassifier(IntentClassifier):
         if not TUNING:
              
             # Instantiate the classifier:
-            self.classifier = XGBClassifier(
+            class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
+            sample_weights = [class_weights[class_idx] for class_idx in classes]
+            self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=200)
+
+            '''self.classifier = XGBClassifier(
                                         n_estimators = 150,
                                         objective = 'multi:softmax',
                                         n_jobs = os.cpu_count(),
@@ -157,10 +156,10 @@ class XGBoostIntentClassifier(IntentClassifier):
                                         tree_method = 'hist',
                                         early_stopping_rounds = None,
                                         learning_rate = 0.01,
-                                        random_state = self.random_state)
+                                        random_state = self.random_state)'''
 
             # Fit the classifier normally:
-            self.classifier.fit(x, classes)
+            self.classifier.fit(x, classes, sample_weight=sample_weights)
 
         # If tuning is enabled:
         else:
