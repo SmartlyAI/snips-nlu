@@ -142,11 +142,16 @@ class XGBoostIntentClassifier(IntentClassifier):
 
         # If hyperparameter tuning is disabled:
         if not TUNING:
-             
+
+
+            from sklearn.model_selection import train_test_split
+            from sklearn.metrics import accuracy_score
+            x_train, x_test, y_train, y_test = train_test_split(x, classes, test_size = 0.2, random_state=42)
             # Instantiate the classifier:
             class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
             sample_weights = [class_weights[class_idx] for class_idx in classes]
             self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
+            breakpoint()
 
             '''self.classifier = XGBClassifier(
                                         n_estimators = 150,
@@ -159,7 +164,10 @@ class XGBoostIntentClassifier(IntentClassifier):
                                         random_state = self.random_state)'''
 
             # Fit the classifier normally:
-            self.classifier.fit(x, classes, sample_weight=sample_weights)
+            self.classifier.fit(x_train, y_train, sample_weight=sample_weights)
+            y_preds = self.classifier.predict(x_test)
+            print(accuracy_score(y_preds, y_test)
+            breakpoint()
 
         # If tuning is enabled:
         else:
