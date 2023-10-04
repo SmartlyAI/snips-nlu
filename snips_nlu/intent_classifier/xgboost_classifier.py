@@ -143,29 +143,39 @@ class XGBoostIntentClassifier(IntentClassifier):
         # If hyperparameter tuning is disabled:
         if not TUNING:
 
-
             from sklearn.model_selection import train_test_split
             from sklearn.metrics import accuracy_score
+            breakpoint()
             x_train, x_test, y_train, y_test = train_test_split(x, classes, test_size = 0.2, random_state=42)
-            # Instantiate the classifier:
-            class_weights = compute_class_weight("balanced", range(none_class + 1), y_train)
-            sample_weights = [class_weights[class_idx] for class_idx in y_train]
-            self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
 
-            '''self.classifier = XGBClassifier(
-                                        n_estimators = 150,
+
+            # Instantiate the classifier:
+            class_weights = compute_class_weight("balanced", np.unique(y_train), y_train)
+            weights_dict = dict(zip(np.unique(y_train), class_weights))
+            breakpoint()
+            sample_weights = [weights_dict[class_idx] for class_idx in y_train]
+            #sample_weights = [class_weights[class_idx] for class_idx in y_train]
+
+            #self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
+
+            self.classifier = XGBClassifier(
+                                        n_estimators = 100,
                                         objective = 'multi:softmax',
                                         n_jobs = os.cpu_count(),
                                         booster = 'gbtree',
                                         tree_method = 'hist',
                                         early_stopping_rounds = None,
                                         learning_rate = 0.01,
-                                        random_state = self.random_state)'''
+                                        random_state = self.random_state)
 
             # Fit the classifier normally:
-            self.classifier.fit(x_train, y_train, sample_weight=sample_weights)
+            #self.classifier.fit(x_train, y_train, sample_weight=sample_weights)
+
+            self.classifier.fit(x_train, y_train, eval_set=[(x_train, y_train)], verbose=True,eval_metric= "mlogloss", sample_weight= sample_weights)
+
             y_preds = self.classifier.predict(x_test)
             print(accuracy_score(y_preds, y_test))
+
             
         # If tuning is enabled:
         else:
