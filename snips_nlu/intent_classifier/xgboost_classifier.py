@@ -166,7 +166,7 @@ class XGBoostIntentClassifier(IntentClassifier):
             # Fit the classifier normally:
             self.classifier.fit(x_train, y_train, sample_weight=sample_weights)
             y_preds = self.classifier.predict(x_test)
-            print(accuracy_score(y_preds, y_test)
+            print(accuracy_score(y_preds, y_test))
             breakpoint()
 
         # If tuning is enabled:
