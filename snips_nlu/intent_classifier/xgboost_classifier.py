@@ -148,8 +148,8 @@ class XGBoostIntentClassifier(IntentClassifier):
             from sklearn.metrics import accuracy_score
             x_train, x_test, y_train, y_test = train_test_split(x, classes, test_size = 0.2, random_state=42)
             # Instantiate the classifier:
-            class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
-            sample_weights = [class_weights[class_idx] for class_idx in classes]
+            class_weights = compute_class_weight("balanced", range(none_class + 1), y_train)
+            sample_weights = [class_weights[class_idx] for class_idx in y_train]
             self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
 
             '''self.classifier = XGBClassifier(
