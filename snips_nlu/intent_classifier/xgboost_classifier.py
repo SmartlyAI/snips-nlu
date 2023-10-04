@@ -151,7 +151,6 @@ class XGBoostIntentClassifier(IntentClassifier):
             class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
             sample_weights = [class_weights[class_idx] for class_idx in classes]
             self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
-            breakpoint()
 
             '''self.classifier = XGBClassifier(
                                         n_estimators = 150,
@@ -167,8 +166,7 @@ class XGBoostIntentClassifier(IntentClassifier):
             self.classifier.fit(x_train, y_train, sample_weight=sample_weights)
             y_preds = self.classifier.predict(x_test)
             print(accuracy_score(y_preds, y_test))
-            breakpoint()
-
+            
         # If tuning is enabled:
         else:
 
