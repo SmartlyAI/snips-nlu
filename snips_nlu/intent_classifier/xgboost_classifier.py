@@ -70,16 +70,55 @@ class XGBoostIntentClassifier(IntentClassifier):
         language = dataset[LANGUAGE]
         
         data_augmentation_config = self.config.data_augmentation_config
-              
+
+        '''import pandas as pd
+
+        df = pd.DataFrame(dataset['intents']).transpose()
+
+        df['count'] = ''
+
+        for i in range(len(df)):
+            df['count'][df.index==df.index[i]] = len(df["utterances"][df.index==df.index[i]][df.index[i]])
+
+        ones = df[df['count'] == 1]
+        more_than_one = df[df['count'] > 1]
+
+        from sklearn.model_selection import train_test_split
+        more_train, more_test = train_test_split(more_than_one['utterances'].explode(),
+                                                train_size=0.5,
+                                                stratify = more_than_one['utterances'].explode().index,
+                                                random_state=42)
+
+        # Regroup the exploded list
+        more_train = more_train.groupby(more_train.index).agg(list)
+
+        # Add the stratified train to the Series with only one utterance per intent:
+        final_train = pd.concat([more_train, ones['utterances']])
+
+        # Convert to dataframe with series name as column name:
+        final_train = pd.DataFrame(final_train)
+        final_test = pd.DataFrame(more_test)
+        final_test['utterances'] = final_test['utterances'].apply(lambda row: [row])
+
+        # Convert to Snips compatible dict:
+        dataset['intents'] = final_train.transpose().to_dict()'''
+
         # Build training data:
         utterances, classes, intent_list = build_training_data(dataset,
                                                                language,
                                                                data_augmentation_config,
                                                                self.resources,
                                                                self.random_state)
-
         # Store intent list:
         self.intent_list = intent_list
+
+        '''dataset['intents'] = final_test.transpose().to_dict()        
+        utterances_test, classes_test, intent_list_test = build_training_data(dataset,
+                                                                                language,
+                                                                                data_augmentation_config,
+                                                                                self.resources,
+                                                                                self.random_state)'''
+
 
         # If there is only one intent, we don't need to train a classifier (i.e. return instance):
         if len(self.intent_list) <= 1:
@@ -102,6 +141,7 @@ class XGBoostIntentClassifier(IntentClassifier):
         # Fit the featurizer:
         try:
             x = self.featurizer.fit_transform(dataset, utterances, classes, none_class)
+#           x_test = self.featurizer.fit_transform(dataset, utterances_test, classes_test, none_class)
 
         except _EmptyDatasetUtterancesError:
             logger.warning("No (non-empty) utterances found in dataset")
@@ -143,17 +183,14 @@ class XGBoostIntentClassifier(IntentClassifier):
         # If hyperparameter tuning is disabled:
         if not TUNING:
 
-            from sklearn.model_selection import train_test_split
             from sklearn.metrics import accuracy_score
             breakpoint()
-            x_train, x_test, y_train, y_test = train_test_split(x, classes, test_size = 0.2, random_state=42)
-
 
             # Instantiate the classifier:
-            class_weights = compute_class_weight("balanced", np.unique(y_train), y_train)
-            weights_dict = dict(zip(np.unique(y_train), class_weights))
+            class_weights = compute_class_weight("balanced", np.unique(classes), classes)
+            weights_dict = dict(zip(np.unique(classes), class_weights))
             breakpoint()
-            sample_weights = [weights_dict[class_idx] for class_idx in y_train]
+            sample_weights = [weights_dict[class_idx] for class_idx in classes]
             #sample_weights = [class_weights[class_idx] for class_idx in y_train]
 
             #self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
@@ -170,11 +207,15 @@ class XGBoostIntentClassifier(IntentClassifier):
 
             # Fit the classifier normally:
             #self.classifier.fit(x_train, y_train, sample_weight=sample_weights)
-
-            self.classifier.fit(x_train, y_train, eval_set=[(x_train, y_train)], verbose=True,eval_metric= "mlogloss", sample_weight= sample_weights)
+            self.classifier.fit(x, classes,
+                                eval_set=[(x, classes)],
+                                verbose=True,
+                                eval_metric= "mlogloss",
+                                sample_weight= sample_weights)
 
             y_preds = self.classifier.predict(x_test)
-            print(accuracy_score(y_preds, y_test))
+            print(accuracy_score(y_preds, classes_test))
+            breakpoint()
 
             
         # If tuning is enabled:
