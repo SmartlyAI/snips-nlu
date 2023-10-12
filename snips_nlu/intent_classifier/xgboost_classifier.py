@@ -146,7 +146,7 @@ class XGBoostIntentClassifier(IntentClassifier):
             # Instantiate the classifier:
             class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
             sample_weights = [class_weights[class_idx] for class_idx in classes]
-            self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
+            self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=20)
 
             '''self.classifier = XGBClassifier(
                                         n_estimators = 150,
