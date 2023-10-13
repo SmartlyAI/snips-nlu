@@ -71,9 +71,15 @@ class XGBoostIntentClassifier(IntentClassifier):
         
         data_augmentation_config = self.config.data_augmentation_config
 
-        '''import pandas as pd
+        import pandas as pd
 
-        df = pd.DataFrame(dataset['intents']).transpose()
+        test_loc = pd.read_pickle("/snips_train/nfs_server/test_loc.pickle")
+
+        test_set = {}
+        for intent_id in test_loc:
+            intent_list = dataset['intents'].get(intent_id)['utterances']; test_set[intent_id] = intent_list[test_loc[intent_id]:]
+            
+        '''df = pd.DataFrame(dataset['intents']).transpose()
 
         df['count'] = ''
 
