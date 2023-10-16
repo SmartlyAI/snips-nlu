@@ -363,6 +363,11 @@ class XGBoostIntentClassifier(IntentClassifier):
             import pandas as pd
             df = pd.read_pickle("/snips_train/nfs_server/faycal_test_dataset.pickle").drop("expected_intent", axis=1) 
 
+            import pandas as pd
+            df = pd.read_pickle("/snips_train/nfs_server/faycal_test_dataset.pickle").drop("expected_intent", axis=1>
+            df["sentence"] = df["sentence"].apply(lambda row: [text_to_utterance(preprocess_utterance(row))])
+            y_test = [self.featurizer.vectorizer.transform(element) for element in df["sentence"].tolist()]
+
         except _EmptyDatasetUtterancesError:
             logger.warning("No (non-empty) utterances found in dataset")
             self.featurizer = None
