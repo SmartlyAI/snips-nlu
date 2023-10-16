@@ -27,6 +27,9 @@ TUNING = False
 
 
 import re
+
+import sys
+sys.path.append('/snips_train/common')
 from common.utils import EntitiesRegexCompile
 
 def smart_split(self, utterance):
