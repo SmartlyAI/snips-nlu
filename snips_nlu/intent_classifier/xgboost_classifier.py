@@ -72,7 +72,7 @@ def load_smartly_emojis():
         list: list of Snips / Smartly emojis
     """
     smartly_emojis = []
-    with open('common/data/web_emojis_data.json') as k:
+    with open('/common/data/web_emojis_data.json') as k:
         smartly_emojis = json.load(k)
     return smartly_emojis
 
