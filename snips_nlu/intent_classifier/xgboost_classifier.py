@@ -31,8 +31,7 @@ import re
 import sys
 sys.path.append('/snips_train/common')
 import os
-print(os.getcwd())
-breakpoint()
+print(f"Working directort: {os.getcwd()}")
 from common.utils import EntitiesRegexCompile
 
 def smart_split(self, utterance):
