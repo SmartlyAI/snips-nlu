@@ -28,14 +28,30 @@ TUNING = False
 
 import re
 
-import sys
-sys.path.append('/common')
-sys.path.append('/')
-import os
-print(f"Working directory: {os.getcwd()}")
-from common.utils import EntitiesRegexCompile
+class EntitiesRegexCompile():
+    """Compile systems entities with regex rules"""
 
-def smart_split(self, utterance):
+    def __init__(self):
+        self.re_entities = re.compile(r'(@\w+(-\w+)*_\w+:\w+(-\w+)*)', re.I)
+        #self.re_entities = re.compile(r'@[\w-]+_[\w]+:[\w-]+', re.I)
+        self.re_questions = re.compile(r'[\[\]]', re.I)         # the two "\" are to escape and match "[]"
+        self.ents_smartly = re.compile(r'\w+-\w+-\w+', re.I)
+        self.ent_name = re.compile(r'@[a-zA-Z0-9-_]+_')
+        self.find_entity_id = re.compile(r'_[a-zA-Z0-9]+:')
+        self.smartly_sys_ent = re.compile(r'-\w+-\w+$', re.I)   # Regex to find Smartly's system entity format (e.g. SysEntName-fr-fr)
+        self.smartly_custom_ent = re.compile(r'@[\w]+_[\w]+:[\w]+')  # Regex to match custom entities (excludes system entities)
+        self.snips_format = re.compile(r'\[.+\]\(.+\)', re.I)  # general Snips entity format (custom AND system entities) => matches [entity](value) format
+        self.null_excepts = re.compile(r'^(phone-number|email|url).+', re.I)
+        self.arobase = re.compile(r'@')
+        self.doublebare = re.compile(r'//')
+        self.deuxpoints = re.compile(r':')
+        self.point = re.compile(r'\.')
+        self.email = re.compile(r'[\w.-]+@[\w]+.[\w]+', re.I)
+        self.url = re.compile(r'(www\.[\w-]+\.[a-zA-Z]+)|([\w-]{2,}\.[a-zA-Z]{2,})|([a-zA-Z]+://[\w-]+.[a-zA-Z]+)', re.I)
+        self.phone_number = re.compile(r'\b[0-9]{2,3}[-\s]{0,1}[0-9]{2,3}[-\s]{0,1}[0-9]{2,3}[-\s]{0,1}[0-9]{2,3}[-\s]{0,1}[0-9]{2,3}\b', re.I)
+
+
+def smart_split(utterance):
 
     ''' Function to split utterance by white spaces AND by Snips entities
                 => since a simple .split() ignores entities '''
@@ -88,7 +104,7 @@ re_email = global_regex.email
 re_url = global_regex.url
 re_phone_number = global_regex.phone_number
 
-def preprocess_utterance(self, text):
+def preprocess_utterance(text):
     """Preprocess data for parsing
 
     Args:
@@ -152,12 +168,12 @@ def preprocess_utterance(self, text):
         text_remake = text_remake.replace("'", ' ').replace("’", ' ')
 
     # Remove diactritics (Zeus service preprocessing):
-    text_remake = self.remove_diacritics(text_remake)
+    text_remake = remove_diacritics(text_remake)
 
     return text_remake
 
 # Function to remove diacritics:
-def remove_diacritics(self, text):
+def remove_diacritics(text):
     
     # Original text:
     text_remake = text
