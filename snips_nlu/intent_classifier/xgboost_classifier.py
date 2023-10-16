@@ -113,7 +113,7 @@ def preprocess_utterance(text):
     Returns:
         str: data format with fix values
     """
-    text_remake = text
+    text_remake = text.lower()
     if global_regex.arobase.search(text_remake): 
         text_remake = ' '.join([global_regex.arobase.sub(' arobase ', tok) if not re_snips_format.findall(tok) else tok for tok in smart_split(text_remake)])
 
