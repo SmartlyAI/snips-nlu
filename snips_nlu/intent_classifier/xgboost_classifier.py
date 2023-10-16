@@ -77,8 +77,13 @@ class XGBoostIntentClassifier(IntentClassifier):
 
         test_set = {}
         for intent_id in test_loc:
-            intent_list = dataset['intents'].get(intent_id)['utterances']; test_set[intent_id] = intent_list[test_loc[intent_id]:]
+            intent_list = dataset['intents'].get(intent_id)['utterances']
             
+            test_set[intent_id] = intent_list[test_loc[intent_id]:]
+
+            del intent_list[test_loc[intent_id]:]
+
+
         '''df = pd.DataFrame(dataset['intents']).transpose()
 
         df['count'] = ''
