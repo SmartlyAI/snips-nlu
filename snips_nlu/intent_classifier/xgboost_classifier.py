@@ -361,12 +361,15 @@ class XGBoostIntentClassifier(IntentClassifier):
 #           x_test = self.featurizer.fit_transform(dataset, utterances_test, classes_test, none_class)
 
             import pandas as pd
-            df = pd.read_pickle("/snips_train/nfs_server/faycal_test_dataset.pickle").drop("expected_intent", axis=1) 
+            from scipy.sparse import vstack
 
-            import pandas as pd
-            df = pd.read_pickle("/snips_train/nfs_server/faycal_test_dataset.pickle").drop("expected_intent", axis=1>
+            df = pd.read_pickle("/snips_train/nfs_server/faycal_test_dataset.pickle").drop("expected_intent", axis=1) 
             df["sentence"] = df["sentence"].apply(lambda row: [text_to_utterance(preprocess_utterance(row))])
-            y_test = [self.featurizer.vectorizer.transform(element) for element in df["sentence"].tolist()]
+            x_test = vstack([self.featurizer.vectorizer.transform(element) for element in df["sentence"].tolist()])
+
+            intentID_toIndex = dict(zip(dataset["intents"].keys(), range(len(dataset["intents"].keys()))))
+            df["index"] = df["intent_id"].apply(lambda row: intentID_toIndex[row])
+            y_test = df["index"].tolist()
 
         except _EmptyDatasetUtterancesError:
             logger.warning("No (non-empty) utterances found in dataset")
@@ -439,7 +442,7 @@ class XGBoostIntentClassifier(IntentClassifier):
                                 sample_weight= sample_weights)
 
             y_preds = self.classifier.predict(x_test)
-            print(accuracy_score(y_preds, classes_test))
+            print(accuracy_score(y_preds, y_test))
             breakpoint()
 
             
