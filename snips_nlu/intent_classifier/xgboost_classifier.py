@@ -412,12 +412,10 @@ class XGBoostIntentClassifier(IntentClassifier):
         if not TUNING:
 
             from sklearn.metrics import accuracy_score, f1_score, classification_report
-            breakpoint()
 
             # Instantiate the classifier:
             class_weights = compute_class_weight("balanced", np.unique(classes), classes)
             weights_dict = dict(zip(np.unique(classes), class_weights))
-            breakpoint()
             sample_weights = [weights_dict[class_idx] for class_idx in classes]
             #sample_weights = [class_weights[class_idx] for class_idx in y_train]
 
@@ -436,7 +434,7 @@ class XGBoostIntentClassifier(IntentClassifier):
             # Fit the classifier normally:
             #self.classifier.fit(x_train, y_train, sample_weight=sample_weights)
             self.classifier.fit(x, classes,
-                                eval_set=[(x, classes)],
+                                eval_set=[(x_test, y_test), (x, classes)],
                                 verbose=True,
                                 eval_metric= "mlogloss",
                                 sample_weight= sample_weights)
