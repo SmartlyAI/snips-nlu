@@ -411,7 +411,7 @@ class XGBoostIntentClassifier(IntentClassifier):
         # If hyperparameter tuning is disabled:
         if not TUNING:
 
-            from sklearn.metrics import accuracy_score
+            from sklearn.metrics import accuracy_score, f1_score, classification_report
             breakpoint()
 
             # Instantiate the classifier:
@@ -442,7 +442,10 @@ class XGBoostIntentClassifier(IntentClassifier):
                                 sample_weight= sample_weights)
 
             y_preds = self.classifier.predict(x_test)
-            print(accuracy_score(y_preds, y_test))
+            print("- Smoke test:", accuracy_score(x, classes))
+            print("- Accuracy:", accuracy_score(y_preds, y_test))
+            print("- F-1 Score:", f1_score(y_preds, y_test))
+            print("- Classification Report:\n", classification_report(y_preds, y_test))
             breakpoint()
 
             
