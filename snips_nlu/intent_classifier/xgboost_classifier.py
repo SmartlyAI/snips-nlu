@@ -14,7 +14,7 @@ from snips_nlu.dataset import validate_and_format_dataset
 from snips_nlu.exceptions import LoadingError, _EmptyDatasetUtterancesError
 from snips_nlu.intent_classifier.featurizer import Featurizer
 from snips_nlu.intent_classifier.intent_classifier import IntentClassifier
-from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, text_to_utterance
+from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, get_regularization_factor, text_to_utterance
 from snips_nlu.pipeline.configs import XGBoostIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
 from sklearn.ensemble import GradientBoostingClassifier
@@ -416,12 +416,32 @@ class XGBoostIntentClassifier(IntentClassifier):
             # Instantiate the classifier:
             class_weights = compute_class_weight("balanced", np.unique(classes), classes)
             weights_dict = dict(zip(np.unique(classes), class_weights))
-            sample_weights = [weights_dict[class_idx] for class_idx in classes]
-            #sample_weights = [class_weights[class_idx] for class_idx in y_train]
+            #sample_weights = [weights_dict[class_idx] for class_idx in classes]
 
-            #self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
+            sample_weights = [class_weights[class_idx] for class_idx in classes]
+            self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=100)
 
-            self.classifier = XGBClassifier(
+
+###################################
+            LOG_REG_ARGS = {
+    "loss": "log",
+    "penalty": "l2",
+    "max_iter": 1000,
+    "tol": 1e-3,
+    "n_jobs": -1
+}
+
+            from sklearn.linear_model import SGDClassifier
+            alpha = get_regularization_factor(dataset)
+            class_weights_arr = compute_class_weight("balanced", range(none_class + 1), classes)
+            class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
+            self.classifier = SGDClassifier(random_state=self.random_state, alpha=alpha, class_weight=class_weight, **LOG_REG_ARGS)
+
+
+####################################
+
+
+            '''self.classifier = XGBClassifier(
                                         n_estimators = 100,
                                         objective = 'multi:softmax',
                                         n_jobs = os.cpu_count(),
@@ -429,18 +449,18 @@ class XGBoostIntentClassifier(IntentClassifier):
                                         tree_method = 'hist',
                                         early_stopping_rounds = None,
                                         learning_rate = 0.01,
-                                        random_state = self.random_state)
+                                        random_state = self.random_state)'''
 
             # Fit the classifier normally:
-            #self.classifier.fit(x_train, y_train, sample_weight=sample_weights)
-            self.classifier.fit(x, classes,
+            self.classifier.fit(x, classes) #, sample_weight=sample_weights)
+            '''self.classifier.fit(x, classes,
                                 eval_set=[(x_test, y_test), (x, classes)],
                                 verbose=True,
                                 eval_metric= "mlogloss",
-                                sample_weight= sample_weights)
+                                sample_weight= sample_weights)'''
 
             y_preds = self.classifier.predict(x_test)
-            print("- Smoke test:", accuracy_score(x, classes))
+            print("- Smoke test:", accuracy_score(self.classifier.predict(x), classes))
             print("- Accuracy:", accuracy_score(y_preds, y_test))
             print("- F-1 Score:", f1_score(y_preds, y_test))
             print("- Classification Report:\n", classification_report(y_preds, y_test))
