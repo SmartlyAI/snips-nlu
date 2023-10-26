@@ -14,16 +14,26 @@ from snips_nlu.dataset import validate_and_format_dataset
 from snips_nlu.exceptions import LoadingError, _EmptyDatasetUtterancesError
 from snips_nlu.intent_classifier.featurizer import Featurizer
 from snips_nlu.intent_classifier.intent_classifier import IntentClassifier
-from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, text_to_utterance
+from snips_nlu.intent_classifier.log_reg_classifier_utils import build_training_data, get_regularization_factor, text_to_utterance
 from snips_nlu.pipeline.configs import XGBoostIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
-from sklearn.ensemble import GradientBoostingClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import SGDClassifier
+from sklearn.neural_network import MLPClassifier
 from sklearn.utils.class_weight import compute_class_weight
 import numpy as np
 
 logger = logging.getLogger(__name__)
 DEBUG = False
 TUNING = False
+
+LOG_REG_ARGS = {
+    "loss": "log",
+    "penalty": "l2",
+    "max_iter": 1000,
+    "tol": 1e-3,
+    "n_jobs": -1
+}
 
 # We set tol to 1e-3 to silence the following warning with Python 2 (
 # scikit-learn 0.20):
@@ -60,7 +70,7 @@ class XGBoostIntentClassifier(IntentClassifier):
         Returns:
             :class:`XGBoostIntentClassifier`: The same instance, trained
         """
-        from xgboost import XGBClassifier
+        #from xgboost import XGBClassifier
         
         logger.info("Fitting XGBoostIntentClassifier...")
         dataset = validate_and_format_dataset(dataset) 
@@ -146,7 +156,16 @@ class XGBoostIntentClassifier(IntentClassifier):
             # Instantiate the classifier:
             class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
             sample_weights = [class_weights[class_idx] for class_idx in classes]
-            self.classifier = GradientBoostingClassifier(verbose=True, n_estimators=20)
+            
+            alpha = get_regularization_factor(dataset)
+            class_weights_arr = compute_class_weight("balanced", range(none_class + 1), classes)
+            class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
+            clf1 = SGDClassifier(random_state=self.random_state, alpha=alpha, class_weight=class_weight, **LOG_REG_ARGS)
+            clf2 = KNeighborsClassifier(n_neighbors=10)
+            clf4 = MLPClassifier(activation="logistic")
+
+            from sklearn.ensemble import VotingClassifier
+            self.classifier = VotingClassifier(estimators=[('LR', clf1), ('KNN', clf2), ('MLP', clf4)], voting='soft', n_jobs=-1)            
 
             '''self.classifier = XGBClassifier(
                                         n_estimators = 150,
@@ -159,7 +178,7 @@ class XGBoostIntentClassifier(IntentClassifier):
                                         random_state = self.random_state)'''
 
             # Fit the classifier normally:
-            self.classifier.fit(x, classes, sample_weight=sample_weights)
+            self.classifier.fit(x, classes)
 
         # If tuning is enabled:
         else:
