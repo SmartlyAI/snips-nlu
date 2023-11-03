@@ -39,7 +39,17 @@ def normalize_token(token):
 
 
 def _stem(string, resources):
-    return pickle.loads(zlib.decompress(get_stems(resources).get(string, string)))
+
+    # Get stem from Shelf:
+    stem = get_stems(resources).get(string, string)
+
+    # If stem is not in Shelf, return the default string:
+    if type(stem) == str:
+        return stem
+    
+    # If it is in Shelf, decompress and unpickle it before returning:
+    else:
+        return pickle.loads(zlib.decompress(stem))
 
 
 class Token(object):
