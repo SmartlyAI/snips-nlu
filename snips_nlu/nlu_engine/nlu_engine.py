@@ -153,15 +153,19 @@ class SnipsNLUEngine(ProcessingUnit):
     @log_elapsed_time(logger, logging.DEBUG, "Parsed input in {elapsed_time}")
     @fitted_required
     def parse(self, text, intents=None, top_n=None):
+
         """Performs intent parsing on the provided *text* by calling its intent
         parsers successively
 
         Args:
+
             text (str): Input
+
             intents (str or list of str, optional): If provided, reduces the
                 scope of intent parsing to the provided list of intents.
                 The ``None`` intent is never filtered out, meaning that it can
                 be returned even when using an intents scope.
+
             top_n (int, optional): when provided, this method will return a
                 list of at most ``top_n`` most likely intents, instead of a
                 single parsing result.
@@ -180,8 +184,7 @@ class SnipsNLUEngine(ProcessingUnit):
             InvalidInputError: When input type is not unicode
         """
         if not isinstance(text, str):
-            raise InvalidInputError("Expected unicode but received: %s"
-                                    % type(text))
+            raise InvalidInputError("Expected unicode but received: %s" % type(text))
 
         if isinstance(intents, str):
             intents = {intents}
@@ -193,6 +196,8 @@ class SnipsNLUEngine(ProcessingUnit):
                 if intent not in self.dataset_metadata["slot_name_mappings"]:
                     raise IntentNotFoundError(intent)
 
+        # Call intent parsers successively until one returns a non-empty result
+        # If top_n is not provided, return a single parse result:
         if top_n is None:
             none_proba = 0.0
             for parser in self.intent_parsers:
@@ -200,20 +205,35 @@ class SnipsNLUEngine(ProcessingUnit):
                 if is_empty(res):
                     none_proba = res[RES_INTENT][RES_PROBA]
                     continue
+
+                # Resolve slots:
                 resolved_slots = self._resolve_slots(text, res[RES_SLOTS])
                 return parsing_result(text, intent=res[RES_INTENT],
                                       slots=resolved_slots)
             return empty_result(text, none_proba)
 
+
+        # If top_n is provided, return a list of n best parse results
+        # List with the detected intent(s) and their probability:
         intents_results = self.get_intents(text)
         if intents is not None:
             intents_results = [res for res in intents_results
                                if res[RES_INTENT_NAME] is None
                                or res[RES_INTENT_NAME] in intents]
+            
+        # Take best n intents:
         intents_results = intents_results[:top_n]
+
+        # Get entities:
         results = []
+
+        # For each detected intent in the top N intents
         for intent_res in intents_results:
+            
+            # Get slots with knowledge of the intent:
             slots = self.get_slots(text, intent_res[RES_INTENT_NAME])
+
+            # extraction_result simply formats the result by adding the detected slots to the detected intent:
             results.append(extraction_result(intent_res, slots))
         return results
 

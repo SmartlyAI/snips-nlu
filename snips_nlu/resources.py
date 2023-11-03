@@ -4,6 +4,7 @@ import json
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
+import shelve
 
 from future.utils import iteritems
 
@@ -67,7 +68,16 @@ def load_resources_from_dir(resources_dir, required_resources=None):
     noise = None
 
     if stems_filename is not None:
-        stems = _get_stems(resources_dir / "stemming", stems_filename)
+
+        #stems = _get_stems(resources_dir / "stemming", stems_filename)
+
+        lang = metadata["language"]
+
+        try:
+            stems = shelve.open(f"/snips_parse/resources/stems/stems_{lang}_compressed.db", "r")
+        except:
+            stems = shelve.open(f"/snips_parse/resources/stems/stems_fr_compressed.db", "r")
+        
     if stop_words_filename is not None:
         stop_words = _get_stop_words(resources_dir, stop_words_filename)
     if noise_filename is not None:
