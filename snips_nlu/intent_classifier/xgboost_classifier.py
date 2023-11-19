@@ -7,6 +7,9 @@ from pathlib import Path
 import joblib
 import os
 
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+
 from snips_nlu.common.log_utils import DifferedLoggingMessage, log_elapsed_time
 from snips_nlu.common.utils import check_persisted_path, fitted_required, json_string
 from snips_nlu.constants import LANGUAGE, RES_PROBA
@@ -432,10 +435,18 @@ class XGBoostIntentClassifier(IntentClassifier):
 }
 
             from sklearn.linear_model import SGDClassifier
+            class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
+            sample_weights = [class_weights[class_idx] for class_idx in classes]
+            
             alpha = get_regularization_factor(dataset)
             class_weights_arr = compute_class_weight("balanced", range(none_class + 1), classes)
             class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
-            self.classifier = SGDClassifier(random_state=self.random_state, alpha=alpha, class_weight=class_weight, **LOG_REG_ARGS)
+            clf1 = SGDClassifier(random_state=self.random_state, alpha=alpha, class_weight=class_weight, **LOG_REG_ARGS)
+            clf2 = KNeighborsClassifier(n_neighbors=10)
+            clf4 = MLPClassifier(activation="logistic")
+
+            from sklearn.ensemble import VotingClassifier
+            self.classifier = VotingClassifier(estimators=[('LR', clf1), ('KNN', clf2), ('MLP', clf4)], voting='soft', n_jobs=-1)            
 
 
 ####################################
@@ -462,10 +473,9 @@ class XGBoostIntentClassifier(IntentClassifier):
             y_preds = self.classifier.predict(x_test)
             print("- Smoke test:", accuracy_score(self.classifier.predict(x), classes))
             print("- Accuracy:", accuracy_score(y_preds, y_test))
-            print("- F-1 Score:", f1_score(y_preds, y_test))
-            print("- Classification Report:\n", classification_report(y_preds, y_test))
+            print("- F-1 Score:", f1_score(y_preds, y_test, average = 'weighted'))
             breakpoint()
-
+            print("- Classification Report:\n", classification_report(y_preds, y_test))
             
         # If tuning is enabled:
         else:
