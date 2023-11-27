@@ -4,6 +4,7 @@ import json
 from collections import defaultdict
 from copy import deepcopy
 from pathlib import Path
+import shelve
 
 from future.utils import iteritems
 
@@ -67,7 +68,16 @@ def load_resources_from_dir(resources_dir, required_resources=None):
     noise = None
 
     if stems_filename is not None:
-        stems = _get_stems(resources_dir / "stemming", stems_filename)
+
+        #stems = _get_stems(resources_dir / "stemming", stems_filename)
+
+        lang = metadata["language"]
+
+        try:
+            stems = shelve.open(f"./resources/stems/stems_{lang}_compressed.db", "r")
+        except:
+            stems = shelve.open(f"./resources/stems/stems_fr_compressed.db", "r")
+        
     if stop_words_filename is not None:
         stop_words = _get_stop_words(resources_dir, stop_words_filename)
     if noise_filename is not None:
@@ -219,11 +229,11 @@ def persist_resources(resources, resources_dest_path, required_resources):
             .with_suffix(".txt")
         _persist_stop_words(get_stop_words(resources), stop_words_path)
 
-    if metadata[STEMS] is not None:
+    '''if metadata[STEMS] is not None:
         stemming_dir = resources_dest_path / "stemming"
         stemming_dir.mkdir()
         stems_path = (stemming_dir / metadata[STEMS]).with_suffix(".txt")
-        _persist_stems(get_stems(resources), stems_path)
+        _persist_stems(get_stems(resources), stems_path)'''
 
     if metadata[GAZETTEERS]:
         gazetteers_dir = resources_dest_path / "gazetteers"
@@ -360,7 +370,7 @@ def _load_stems(path):
     return stems
 
 
-def _persist_stems(stems, path):
+'''def _persist_stems(stems, path):
     reversed_stems = defaultdict(list)
     for value, stem in iteritems(stems):
         reversed_stems[stem].append(value)
@@ -368,4 +378,4 @@ def _persist_stems(stems, path):
         for stem, values in sorted(iteritems(reversed_stems)):
             elements = [stem] + sorted(values)
             line = ",".join(elements)
-            f.write("%s\n" % line)
+            f.write("%s\n" % line)'''

@@ -190,6 +190,9 @@ class ProbabilisticIntentParser(IntentParser):
 
         if intent not in self.slot_fillers:
             raise IntentNotFoundError(intent)
+        
+        # "slot_fillers" his a dict of slot fillers, indexed by intent name
+        # e.g. one CRFSlotFiller instance for each intent:
         return self.slot_fillers[intent].get_slots(text)
 
     @check_persisted_path

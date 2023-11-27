@@ -5,6 +5,7 @@ from builtins import object
 
 from snips_nlu.resources import get_stems
 from snips_nlu.constants import SUPPORTED_LANGUAGES
+import pickle, zlib
 
 
 def stem(string, language, resources):
@@ -38,7 +39,17 @@ def normalize_token(token):
 
 
 def _stem(string, resources):
-    return get_stems(resources).get(string, string)
+
+    # Get stem from Shelf:
+    stem = get_stems(resources).get(string, string)
+
+    # If stem is not in Shelf, return the default string:
+    if type(stem) == str:
+        return stem
+    
+    # If it is in Shelf, decompress and unpickle it before returning:
+    else:
+        return pickle.loads(zlib.decompress(stem))
 
 
 class Token(object):
