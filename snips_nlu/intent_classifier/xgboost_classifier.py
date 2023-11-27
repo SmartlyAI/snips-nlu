@@ -7,6 +7,9 @@ from pathlib import Path
 import joblib
 import os
 
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neural_network import MLPClassifier
+
 from snips_nlu.common.log_utils import DifferedLoggingMessage, log_elapsed_time
 from snips_nlu.common.utils import check_persisted_path, fitted_required, json_string
 from snips_nlu.constants import LANGUAGE, RES_PROBA
@@ -27,13 +30,222 @@ logger = logging.getLogger(__name__)
 DEBUG = False
 TUNING = False
 
-LOG_REG_ARGS = {
-    "loss": "log",
-    "penalty": "l2",
-    "max_iter": 1000,
-    "tol": 1e-3,
-    "n_jobs": -1
-}
+
+import re
+
+class EntitiesRegexCompile():
+    """Compile systems entities with regex rules"""
+
+    def __init__(self):
+        self.re_entities = re.compile(r'(@\w+(-\w+)*_\w+:\w+(-\w+)*)', re.I)
+        #self.re_entities = re.compile(r'@[\w-]+_[\w]+:[\w-]+', re.I)
+        self.re_questions = re.compile(r'[\[\]]', re.I)         # the two "\" are to escape and match "[]"
+        self.ents_smartly = re.compile(r'\w+-\w+-\w+', re.I)
+        self.ent_name = re.compile(r'@[a-zA-Z0-9-_]+_')
+        self.find_entity_id = re.compile(r'_[a-zA-Z0-9]+:')
+        self.smartly_sys_ent = re.compile(r'-\w+-\w+$', re.I)   # Regex to find Smartly's system entity format (e.g. SysEntName-fr-fr)
+        self.smartly_custom_ent = re.compile(r'@[\w]+_[\w]+:[\w]+')  # Regex to match custom entities (excludes system entities)
+        self.snips_format = re.compile(r'\[.+\]\(.+\)', re.I)  # general Snips entity format (custom AND system entities) => matches [entity](value) format
+        self.null_excepts = re.compile(r'^(phone-number|email|url).+', re.I)
+        self.arobase = re.compile(r'@')
+        self.doublebare = re.compile(r'//')
+        self.deuxpoints = re.compile(r':')
+        self.point = re.compile(r'\.')
+        self.email = re.compile(r'[\w.-]+@[\w]+.[\w]+', re.I)
+        self.url = re.compile(r'(www\.[\w-]+\.[a-zA-Z]+)|([\w-]{2,}\.[a-zA-Z]{2,})|([a-zA-Z]+://[\w-]+.[a-zA-Z]+)', re.I)
+        self.phone_number = re.compile(r'\b[0-9]{2,3}[-\s]{0,1}[0-9]{2,3}[-\s]{0,1}[0-9]{2,3}[-\s]{0,1}[0-9]{2,3}[-\s]{0,1}[0-9]{2,3}\b', re.I)
+
+
+def smart_split(utterance):
+
+    ''' Function to split utterance by white spaces AND by Snips entities
+                => since a simple .split() ignores entities '''
+
+    # Split by Snips entity format OR by white spaces (\s):
+    s = re.compile(r'(\[.*?\]\(.*?\))|\s', re.I)
+    space_ent_split = re.split(s, utterance)
+
+    # Remove empty matches from list:
+    space_ent_split = [element for element in space_ent_split if element not in [' ', '', None]]
+
+    return space_ent_split
+
+def load_smartly_emojis():
+    """Load mapping Smartly emojis
+
+    Returns:
+        list: list of Snips / Smartly emojis
+    """
+    smartly_emojis = []
+    with open('/common/data/web_emojis_data.json') as k:
+        smartly_emojis = json.load(k)
+    return smartly_emojis
+
+def build_search_emojis(emojis_data):
+    """build compile data for emojis
+
+    Args:
+        emojis_data (dict): emojis request data
+
+    Returns:
+        src_compile: regex compile fo entities
+    """
+    compile_string = "".join([k for k in emojis_data.keys()])
+    compile_string = r"[{}]".format(compile_string)
+    compile_emojis = re.compile(compile_string)
+    return compile_emojis
+
+emojis_data    = load_smartly_emojis()
+compile_emojis = build_search_emojis(emojis_data)
+global_regex = EntitiesRegexCompile()
+re_ents      = global_regex.re_entities
+re_quest     = global_regex.re_questions
+re_entity_name = global_regex.ent_name
+find_entity_id = global_regex.find_entity_id
+ents_smtly   = global_regex.ents_smartly
+re_custom_entity = global_regex.smartly_custom_ent
+re_snips_format = global_regex.snips_format
+re_email = global_regex.email
+re_url = global_regex.url
+re_phone_number = global_regex.phone_number
+
+def preprocess_utterance(text):
+    """Preprocess data for parsing
+
+    Args:
+        text (str): input data
+
+    Returns:
+        str: data format with fix values
+    """
+    text_remake = text.lower()
+    if global_regex.arobase.search(text_remake): 
+        text_remake = ' '.join([global_regex.arobase.sub(' arobase ', tok) if not re_snips_format.findall(tok) else tok for tok in smart_split(text_remake)])
+
+    if global_regex.doublebare.search(text_remake): 
+        text_remake = ' '.join([global_regex.doublebare.sub(' doublebare ', tok) if not re_snips_format.findall(tok) else tok for tok in smart_split(text_remake)])
+
+    if global_regex.deuxpoints.search(text_remake): 
+        text_remake = ' '.join([global_regex.deuxpoints.sub(' deuxpoints ', tok) if not re_snips_format.findall(tok) else tok for tok in smart_split(text_remake)])
+
+    if not re.compile(r"\d+\.\d+").findall(text_remake):
+        if global_regex.point.search(text_remake):
+            text_remake = ' '.join([global_regex.point.sub(' point ', tok) if not re_snips_format.findall(tok) else tok  for tok in smart_split(text_remake)])
+
+
+    if re.compile(r"\d+\.\d+").findall(text_remake):
+        text_remake = text_remake.replace('.', ',')
+
+
+    # Convert emojis to their names if they exist:
+    # If a new-style emoji exists in the utterance:
+    if compile_emojis.search(text_remake):
+
+        # Find all emojis in utterance:
+        emojis = compile_emojis.findall(text_remake)
+
+        # Clean U+fe0f invisible character:
+        emojis = [emoji for emoji in emojis if emoji != '️']
+
+        # For each found emoji:
+        for em in emojis:
+
+            #print("emojis_data name: ", emojis_data[em]['name'])
+            try:
+                text_remake = re.sub(em, ' ' + emojis_data[em]['name'] + ' ' , text_remake)
+
+                # Remove invisible variation character:
+                text_remake = text_remake.replace('️', '')
+            except:
+                pass
+
+        # Remove skin tone character:
+        skin_tones = [' 🏻',' 🏼',' 🏽' ,' 🏾' ,' 🏿']
+
+        for tone in skin_tones:
+            text_remake = text_remake.replace(tone, '')
+
+    # Remove double spaces if they exist:
+    text_remake = text_remake.replace('  ', ' ')
+
+    # Remove apostrophes (only if stop words are activated => to avoid multiplicity of definite articles for example):
+    if False:
+        text_remake = text_remake.replace("'", ' ').replace("’", ' ')
+
+    # Remove diactritics (Zeus service preprocessing):
+    text_remake = remove_diacritics(text_remake)
+
+    return text_remake
+
+# Function to remove diacritics:
+def remove_diacritics(text):
+    
+    # Original text:
+    text_remake = text
+
+    # Remove diacritics:
+    text_remake = re.sub(re.compile(r'Á|À|Â|Ä|A̧|Ą|Ⱥ|Ǎ|Ȧ|Ạ|Ā|Ã'), 'A', text_remake)
+    text_remake = re.sub(re.compile(r'á|à|â|ä|a̧|ą|ⱥ|ǎ|ȧ|ạ|ā|ã'), 'a', text_remake)
+    text_remake = re.sub(re.compile(r'É|È|Ê|Ë|Ȩ|Ę|Ɇ|Ě|Ė|Ẹ|Ē|Ẽ'), "E", text_remake)
+    text_remake = re.sub(re.compile(r'é|è|ê|ë|ȩ|ę|ɇ|ě|ė|ẹ|ē|ẽ'), "e", text_remake)
+    text_remake = re.sub(re.compile(r'Ć|C̀|Ĉ|C̈|Ç|C̨|Ȼ|Č|Ċ|C̣|C̄|C̃'), "C", text_remake)
+    text_remake = re.sub(re.compile(r'ć|c̀|ĉ|c̈|ç|c̨|ȼ|č|ċ|c̣|c̄|c̃'), "c", text_remake)
+    text_remake = re.sub(re.compile(r'Í|Ì|Î|Ï|I̧|Į|Ɨ|Ǐ|İ|Ị|Ī|Ĩ'), "I", text_remake)
+    text_remake = re.sub(re.compile(r'í|ì|î|ï|i̧|į|ɨ|ǐ|i|ị|ī|ĩ'), "i", text_remake)
+    text_remake = re.sub(re.compile(r'J́|J̀|Ĵ|J̈|J̧|J̨|Ɉ|J̌|J̇|J̣|J̄|J̃'), "J", text_remake)
+    text_remake = re.sub(re.compile(r'j́|j̀|ĵ|j̈|j̧|j̨|ɉ|ǰ|j|j̣|j̄|j̃'), "j", text_remake)
+    text_remake = re.sub(re.compile(r'Ĺ|L̀|L̂|L̈|Ļ|L̨|Ł|Ƚ|Ľ|L̇|Ḷ|L̄|L̃'), "L", text_remake)
+    text_remake = re.sub(re.compile(r'ĺ|l̀|l̂|l̈|ļ|l̨|ł|ƚ|ľ|l̇|ḷ|l̄|l̃'), "l", text_remake)
+    text_remake = re.sub(re.compile(r'Ń|Ǹ|N̂|N̈|Ņ|N̨|Ꞥ|Ň|Ṅ|Ṇ|N̄|Ñ'), "N", text_remake)
+    text_remake = re.sub(re.compile(r'ń|ǹ|n̂|n̈|ņ|n̨|ꞥ|ň|ṅ|ṇ|n̄|ñ'), "n", text_remake)
+    text_remake = re.sub(re.compile(r'Ó|Ò|Ô|Ö|O̧|Ǫ|Ø|Ɵ|Ǒ|Ȯ|Ọ|Ō|Õ'), "O", text_remake)
+    text_remake = re.sub(re.compile(r'ó|ò|ô|ö|o̧|ǫ|ø|ɵ|ǒ|ȯ|ọ|ō|õ'), "o", text_remake)
+    text_remake = re.sub(re.compile(r'Ś|S̀|Ŝ|S̈|Ş|S̨|Ꞩ|Š|Ṡ|Ṣ|S̄|S̃'), "S", text_remake)
+    text_remake = re.sub(re.compile(r'ś|s̀|ŝ|s̈|ş|s̨|ꞩ|š|ṡ|ṣ|s̄|s̃'), "s", text_remake)
+    text_remake = re.sub(re.compile(r'T́|T̀|T̂|T̈|Ţ|T̨|Ⱦ|Ŧ|Ť|Ṫ|Ṭ|T̄|T̃'), "T", text_remake)
+    text_remake = re.sub(re.compile(r't́|t̀|t̂|ẗ|Ţ|ţ|t̨|ⱦ|ŧ|ť|ṫ|ṭ|t̄|t̃'), "t", text_remake)
+    text_remake = re.sub(re.compile(r'Ú|Ù|Û|Ü|U̧|Ų|Ʉ|Ǔ|U̇|Ụ|Ū|Ũ'), "U", text_remake)
+    text_remake = re.sub(re.compile(r'ú|ù|û|ü|u̧|ų|ʉ|ǔ|u̇|ụ|ū|ũ'), "u", text_remake)
+    text_remake = re.sub(re.compile(r'Ý|Ỳ|Ŷ|Ÿ|Y̧|Y̨|Ɏ|Y̌|Ẏ|Ỵ|Ȳ|Ỹ'), "Y", text_remake)
+    text_remake = re.sub(re.compile(r'ý|ỳ|ŷ|ÿ|y̧|y̨|ɏ|y̌|ẏ|ỵ|ȳ|ỹ'), "y", text_remake)
+    text_remake = re.sub(re.compile(r'Ź|Z̀|Ẑ|Z̈|Z̧|Z̨|Ƶ|Ž|Ż|Ẓ|Z̄|Z̃'), "Z", text_remake)
+    text_remake = re.sub(re.compile(r'ź|z̀|ẑ|z̈|z̧|z̨|ƶ|ž|ż|ẓ|z̄|z̃'), "z", text_remake)
+    text_remake = re.sub(re.compile(r'Æ'), "AE", text_remake)
+    text_remake = re.sub(re.compile(r'æ'), "ae", text_remake)
+    text_remake = re.sub(re.compile(r'Œ'), "OE", text_remake)
+    text_remake = re.sub(re.compile(r'œ'), "oe", text_remake)
+
+    # Remove special characters and ponctuation: 
+    text_remake = re.sub(re.compile(r'\?|!|¿|;|\{|\}|«|»|\"|\$|\<|\>|\*'), " ", text_remake)
+
+    # Remove parenthesis and brackets ONLY if not Snips entity:
+    text_remake = ' '.join([re.sub(re.compile(r'\[|\]|\(|\)'), " ", word) if not re_snips_format.findall(word)
+                            else word
+                            for word in smart_split(text_remake)])
+
+    # Remove comma "," ONLY if it's not a float number:
+    text_remake = ' '.join([re.sub(re.compile(r'(?<=[^0-9])(,)|(,)(?=[^0-9])'), " ", tok) if not re_snips_format.findall(tok) else tok for tok in smart_split(text_remake)])
+
+    # Remove dot & comma only if it's not in a decimal number or in a Snips entity (else if float replace dot by comma):
+    text_remake = ' '.join(
+                            [word.replace('.', '').replace(',', '')
+                            if not re.findall('[0-9]+[,|.][0-9]+', word) and not re_snips_format.findall(word)
+                            else word if re_snips_format.findall(word)
+                            else word.replace('.', ',')
+                            for word in smart_split(text_remake)]
+                            )
+
+    # Remove hyphen IF not date OR negative number:
+    date_neg_re = re.compile(r'\d{1,2}-\d{1,2}-\d{4}|\d{4}-\d{1,2}-\d{1,2}|-[0-9]+[,]+[0-9]+|-[0-9]+')
+    text_remake = ' '.join([re.sub(re.compile(r'-'), " ", tok) if not re_snips_format.findall(tok) and not date_neg_re.findall(tok) else tok for tok in smart_split(text_remake)])
+
+    # Remove multiple white spaces:
+    text_remake = re.sub(re.compile(r'[ ]+'), " ", text_remake)
+
+    # Remove trailing white spaces:
+    text_remake = text_remake.strip()
+
+    return text_remake
 
 # We set tol to 1e-3 to silence the following warning with Python 2 (
 # scikit-learn 0.20):
@@ -80,16 +292,54 @@ class XGBoostIntentClassifier(IntentClassifier):
         language = dataset[LANGUAGE]
         
         data_augmentation_config = self.config.data_augmentation_config
-              
+
+
+        '''df = pd.DataFrame(dataset['intents']).transpose()
+
+        df['count'] = ''
+
+        for i in range(len(df)):
+            df['count'][df.index==df.index[i]] = len(df["utterances"][df.index==df.index[i]][df.index[i]])
+
+        ones = df[df['count'] == 1]
+        more_than_one = df[df['count'] > 1]
+
+        from sklearn.model_selection import train_test_split
+        more_train, more_test = train_test_split(more_than_one['utterances'].explode(),
+                                                train_size=0.5,
+                                                stratify = more_than_one['utterances'].explode().index,
+                                                random_state=42)
+
+        # Regroup the exploded list
+        more_train = more_train.groupby(more_train.index).agg(list)
+
+        # Add the stratified train to the Series with only one utterance per intent:
+        final_train = pd.concat([more_train, ones['utterances']])
+
+        # Convert to dataframe with series name as column name:
+        final_train = pd.DataFrame(final_train)
+        final_test = pd.DataFrame(more_test)
+        final_test['utterances'] = final_test['utterances'].apply(lambda row: [row])
+
+        # Convert to Snips compatible dict:
+        dataset['intents'] = final_train.transpose().to_dict()'''
+
         # Build training data:
         utterances, classes, intent_list = build_training_data(dataset,
                                                                language,
                                                                data_augmentation_config,
                                                                self.resources,
                                                                self.random_state)
-
         # Store intent list:
         self.intent_list = intent_list
+
+        '''dataset['intents'] = final_test.transpose().to_dict()        
+        utterances_test, classes_test, intent_list_test = build_training_data(dataset,
+                                                                                language,
+                                                                                data_augmentation_config,
+                                                                                self.resources,
+                                                                                self.random_state)'''
+
 
         # If there is only one intent, we don't need to train a classifier (i.e. return instance):
         if len(self.intent_list) <= 1:
@@ -112,6 +362,18 @@ class XGBoostIntentClassifier(IntentClassifier):
         # Fit the featurizer:
         try:
             x = self.featurizer.fit_transform(dataset, utterances, classes, none_class)
+#           x_test = self.featurizer.fit_transform(dataset, utterances_test, classes_test, none_class)
+
+            import pandas as pd
+            from scipy.sparse import vstack
+
+            df = pd.read_pickle("/snips_train/nfs_server/faycal_test_dataset.pickle").drop("expected_intent", axis=1) 
+            df["sentence"] = df["sentence"].apply(lambda row: [text_to_utterance(preprocess_utterance(row))])
+            x_test = vstack([self.featurizer.vectorizer.transform(element) for element in df["sentence"].tolist()])
+
+            intentID_toIndex = dict(zip(dataset["intents"].keys(), range(len(dataset["intents"].keys()))))
+            df["index"] = df["intent_id"].apply(lambda row: intentID_toIndex[row])
+            y_test = df["index"].tolist()
 
         except _EmptyDatasetUtterancesError:
             logger.warning("No (non-empty) utterances found in dataset")
@@ -152,8 +414,37 @@ class XGBoostIntentClassifier(IntentClassifier):
 
         # If hyperparameter tuning is disabled:
         if not TUNING:
-             
+
+            from sklearn.metrics import accuracy_score, f1_score, classification_report
+
             # Instantiate the classifier:
+            class_weights = compute_class_weight("balanced", np.unique(classes), classes)
+            weights_dict = dict(zip(np.unique(classes), class_weights))
+            #sample_weights = [weights_dict[class_idx] for class_idx in classes]
+
+            sample_weights = [class_weights[class_idx] for class_idx in classes]
+            
+            alpha = get_regularization_factor(dataset)
+            class_weights_arr = compute_class_weight("balanced", range(none_class + 1), classes)
+            class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
+            clf1 = SGDClassifier(random_state=self.random_state, alpha=alpha, class_weight=class_weight, **LOG_REG_ARGS)
+            clf2 = KNeighborsClassifier(n_neighbors=10)
+            clf4 = MLPClassifier(activation="logistic")
+
+            from sklearn.ensemble import VotingClassifier
+            self.classifier = VotingClassifier(estimators=[('LR', clf1), ('KNN', clf2), ('MLP', clf4)], voting='soft', n_jobs=-1)            
+
+
+###################################
+            LOG_REG_ARGS = {
+    "loss": "log",
+    "penalty": "l2",
+    "max_iter": 1000,
+    "tol": 1e-3,
+    "n_jobs": -1
+}
+
+            from sklearn.linear_model import SGDClassifier
             class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
             sample_weights = [class_weights[class_idx] for class_idx in classes]
             
@@ -167,8 +458,12 @@ class XGBoostIntentClassifier(IntentClassifier):
             from sklearn.ensemble import VotingClassifier
             self.classifier = VotingClassifier(estimators=[('LR', clf1), ('KNN', clf2), ('MLP', clf4)], voting='soft', n_jobs=-1)            
 
+
+####################################
+
+
             '''self.classifier = XGBClassifier(
-                                        n_estimators = 150,
+                                        n_estimators = 100,
                                         objective = 'multi:softmax',
                                         n_jobs = os.cpu_count(),
                                         booster = 'gbtree',
@@ -178,8 +473,20 @@ class XGBoostIntentClassifier(IntentClassifier):
                                         random_state = self.random_state)'''
 
             # Fit the classifier normally:
-            self.classifier.fit(x, classes)
+            self.classifier.fit(x, classes) #, sample_weight=sample_weights)
+            '''self.classifier.fit(x, classes,
+                                eval_set=[(x_test, y_test), (x, classes)],
+                                verbose=True,
+                                eval_metric= "mlogloss",
+                                sample_weight= sample_weights)'''
 
+            y_preds = self.classifier.predict(x_test)
+            print("- Smoke test:", accuracy_score(self.classifier.predict(x), classes))
+            print("- Accuracy:", accuracy_score(y_preds, y_test))
+            print("- F-1 Score:", f1_score(y_preds, y_test, average = 'weighted'))
+            breakpoint()
+            print("- Classification Report:\n", classification_report(y_preds, y_test))
+            
         # If tuning is enabled:
         else:
 
