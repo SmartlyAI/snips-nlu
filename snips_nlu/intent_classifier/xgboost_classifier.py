@@ -347,6 +347,11 @@ class XGBoostIntentClassifier(IntentClassifier):
 
         # pylint: disable=C0103
         # Transform the text into a vector of features:
+        try:
+            self.featurizer.vectorizer.config = self.featurizer.config
+        except:
+            print(f"INFO - No config to change for {self.featurizer.vectorizer}")
+
         X = self.featurizer.transform([text_to_utterance(text)])
 
         # pylint: enable=C0103
