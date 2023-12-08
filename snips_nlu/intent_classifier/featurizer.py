@@ -114,7 +114,9 @@ class Featurizer(ProcessingUnit):
     def transform(self, utterances):
         import scipy.sparse as sp
 
+        print(f"INFO - Transforming using vectorizer: {self.vectorizer}")
         x = self.vectorizer.transform(utterances)
+
         if self.cooccurrence_vectorizer:
             x_cooccurrence = self.cooccurrence_vectorizer.transform(utterances)
             x = sp.hstack((x, x_cooccurrence))
@@ -133,8 +135,6 @@ class Featurizer(ProcessingUnit):
 
         #! In reality, the sparse result returned is given independantly by the following ".transform(x)"
         #! the ".fit_transform(x,dataset)" above is only used to select the best n-grams
-
-        # TODO replace transform() with fit_transform()
         return self.vectorizer.fit_transform(x, y, dataset)
     
 
@@ -234,12 +234,15 @@ class Featurizer(ProcessingUnit):
         featurizer = cls(featurizer_config, **shared)
 
         featurizer.language = featurizer_dict["language_code"]
+        print(f"INFO - Loading featurizer for language {featurizer.language}")
 
         #! TF-IDF, FastText, etc.
         try:
             vectorizer_name = featurizer_dict['config']['vectorizer_config']['unit_name']
+            print(f"INFO - Loading vectorizer {vectorizer_name}")
 
         except:
+            print("WARNING - Requested vectorizer not found. Using TFIDF as default.")
             vectorizer_name = featurizer_dict['config']['tfidf_vectorizer_config']['unit_name']
 
         # Load vectorizer:
@@ -261,16 +264,19 @@ class Featurizer(ProcessingUnit):
 
         # TF-IDF:
         if vectorizer_name == "tfidf_vectorizer":
+            print("INFO - Loading TF-IDF vectorizer")
             vectorizer_path = path / featurizer_dict["tfidf_vectorizer"]
             tfidf_vectorizer = TfidfVectorizer.from_path(vectorizer_path, **shared)
             return tfidf_vectorizer
         
         # FastText:
         elif vectorizer_name == "fasttext_vectorizer":
+            print("INFO - Loading FasTtext/FlauBert vectorizer")
             return FastTextVectorizer()
         
         # SBERT:
         elif vectorizer_name == "sbert_vectorizer":
+            print("INFO - Loading SBERT vectorizer")
             return SBERTVectorizer()        
         
         # Raise error if unknown vectorizer:
@@ -673,10 +679,12 @@ class FastTextVectorizer(ProcessingUnit):
 
         # Load the FastText model and transform the input sentence into a vector:
         fast_model = self.from_path(self.__class__.__bases__[0].by_name('language'))
+        print(f"INFO - Transforming using FastText model: {fast_model} and language: {self.__class__.__bases__[0].by_name('language')}")
         x_fasttext = fast_model[raw_utterance]
 
         # Convert to CSR sparse array:
         x_csr = sp.csr_matrix(x_fasttext)
+        print(f"INFO - FastText vectorizer output shape: {x_csr}")
         
         '''
         # Bot's model ID:
@@ -803,7 +811,13 @@ class FastTextVectorizer(ProcessingUnit):
 
     def from_path(self, lang, path=None, **shared):
         import compress_fasttext
-        return compress_fasttext.models.CompressedFastTextKeyedVectors.load(f'./resources/embeddings/cc.{lang}.300-quantized')
+
+        try:
+            print(f"INFO - Loading FastText model for language: {lang}")
+            return compress_fasttext.models.CompressedFastTextKeyedVectors.load(f'./resources/embeddings/cc.{lang}.300-quantized')
+        
+        except:
+            print(f"WARNING - FastText model not found for language: {lang}.")
 
 
     # Doesn't need to be persisted (pre-trained model) => pass because it's an abstract method:    
