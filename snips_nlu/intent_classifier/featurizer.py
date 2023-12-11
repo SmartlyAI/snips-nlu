@@ -7,6 +7,7 @@ from pathlib import Path
 from scipy import sparse as sp
 import joblib
 import sys, os
+import compress_fasttext
 
 from future.utils import iteritems
 
@@ -272,7 +273,7 @@ class Featurizer(ProcessingUnit):
         # FastText:
         elif vectorizer_name == "fasttext_vectorizer":
             print("INFO - Loading FasTtext/FlauBert vectorizer")
-            return FastTextVectorizer()
+            return FastTextVectorizer.from_path(cls.language)
         
         # SBERT:
         elif vectorizer_name == "sbert_vectorizer":
@@ -678,9 +679,8 @@ class FastTextVectorizer(ProcessingUnit):
         raw_utterance = x[0]['data'][0]['text'].strip()
 
         # Load the FastText model and transform the input sentence into a vector:
-        fast_model = self.from_path(self.__class__.__bases__[0].by_name('language'))
-        print(f"INFO - Transforming using FastText model: {fast_model} and language: {self.__class__.__bases__[0].by_name('language')}")
-        x_fasttext = fast_model[raw_utterance]
+        print(f"INFO - Transforming using FastText model: {self} and language: {self._language}")
+        x_fasttext = self[raw_utterance]
 
         # Convert to CSR sparse array:
         x_csr = sp.csr_matrix(x_fasttext)
@@ -809,9 +809,8 @@ class FastTextVectorizer(ProcessingUnit):
 
         return features
 
-    def from_path(self, lang, path=None, **shared):
-        import compress_fasttext
-
+    @classmethod
+    def from_path(lang, path=None, **shared):
         try:
             print(f"INFO - Loading FastText model for language: {lang}")
             return compress_fasttext.models.CompressedFastTextKeyedVectors.load(f'./resources/embeddings/cc.{lang}.300-quantized')
