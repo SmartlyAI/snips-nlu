@@ -273,7 +273,9 @@ class Featurizer(ProcessingUnit):
         # FastText:
         elif vectorizer_name == "fasttext_vectorizer":
             print("INFO - Loading FasTtext/FlauBert vectorizer")
-            return FastTextVectorizer.from_path(cls.language)
+            fasttext = FastTextVectorizer()
+            fasttext._language = featurizer_dict["language_code"]
+            return fasttext
         
         # SBERT:
         elif vectorizer_name == "sbert_vectorizer":
@@ -678,9 +680,11 @@ class FastTextVectorizer(ProcessingUnit):
         # Raw string of the input sentence:
         raw_utterance = x[0]['data'][0]['text'].strip()
 
+        model = self.from_path(self._language)
+
         # Load the FastText model and transform the input sentence into a vector:
         print(f"INFO - Transforming using FastText model: {self} and language: {self._language}")
-        x_fasttext = self[raw_utterance]
+        x_fasttext = model[raw_utterance]
 
         # Convert to CSR sparse array:
         x_csr = sp.csr_matrix(x_fasttext)
@@ -809,7 +813,7 @@ class FastTextVectorizer(ProcessingUnit):
 
         return features
 
-    @classmethod
+    @staticmethod
     def from_path(lang, path=None, **shared):
         try:
             print(f"INFO - Loading FastText model for language: {lang}")
