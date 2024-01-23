@@ -6,6 +6,9 @@ from builtins import range, str, zip
 from pathlib import Path
 import joblib
 import os
+from sklearn.ensemble import AdaBoostClassifier, RandomForestClassifier
+
+from xgboost import XGBClassifier
 
 from snips_nlu.common.log_utils import DifferedLoggingMessage, log_elapsed_time
 from snips_nlu.common.utils import check_persisted_path, fitted_required, json_string
@@ -153,32 +156,26 @@ class XGBoostIntentClassifier(IntentClassifier):
         # If hyperparameter tuning is disabled:
         if not TUNING:
              
-            # Instantiate the classifier:
-            class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
-            sample_weights = [class_weights[class_idx] for class_idx in classes]
+            #class_weights = compute_class_weight("balanced", range(none_class + 1), classes)
+            #sample_weights = [class_weights[class_idx] for class_idx in classes]
             
+            # Instantiate the classifier:
             alpha = get_regularization_factor(dataset)
             class_weights_arr = compute_class_weight("balanced", range(none_class + 1), classes)
             class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
             clf1 = SGDClassifier(random_state=self.random_state, alpha=alpha, class_weight=class_weight, **LOG_REG_ARGS)
-            clf2 = KNeighborsClassifier(n_neighbors=10)
-            clf4 = MLPClassifier(activation="logistic")
+            clf2 = KNeighborsClassifier(n_neighbors=30)
+            clf3 = XGBClassifier(n_estimators = 100, max_depth=2, objective = 'multi:softmax', n_jobs = os.cpu_count(), booster = 'gbtree', tree_method = 'hist')    
+            clf4 = MLPClassifier(activation="logistic", hidden_layer_sizes=(2, 2))
+            clf5 = AdaBoostClassifier(n_estimators=100)
+            clf6 = RandomForestClassifier(n_estimators=100, max_depth=2)
 
             from sklearn.ensemble import VotingClassifier
-            self.classifier = VotingClassifier(estimators=[('LR', clf1), ('KNN', clf2), ('MLP', clf4)], voting='soft', n_jobs=-1)            
-
-            '''self.classifier = XGBClassifier(
-                                        n_estimators = 150,
-                                        objective = 'multi:softmax',
-                                        n_jobs = os.cpu_count(),
-                                        booster = 'gbtree',
-                                        tree_method = 'hist',
-                                        early_stopping_rounds = None,
-                                        learning_rate = 0.01,
-                                        random_state = self.random_state)'''
+            self.classifier = VotingClassifier(estimators=[('LR', clf1), ('KNN', clf2), ('XGB', clf3), ('MLP', clf4), ('ADA', clf5), ('RF', clf6)],
+                                               voting='soft', n_jobs=-1)            
 
             # Fit the classifier normally:
-            self.classifier.fit(x, classes)
+            self.classifier.fit(x.todense(), classes)
 
         # If tuning is enabled:
         else:
@@ -352,7 +349,7 @@ class XGBoostIntentClassifier(IntentClassifier):
         except:
             print(f"INFO - No config to change for {self.featurizer.vectorizer}")
 
-        X = self.featurizer.transform([text_to_utterance(text)])
+        X = self.featurizer.transform([text_to_utterance(text)]).todense()
 
         # pylint: enable=C0103
         proba_vec = self.classifier.predict_proba(X).astype("float64")
