@@ -14,39 +14,43 @@ from snips_nlu.exceptions import LoadingError, _EmptyDatasetUtterancesError
 from snips_nlu.intent_classifier.featurizer import Featurizer
 from snips_nlu.intent_classifier.intent_classifier import IntentClassifier
 from snips_nlu.intent_classifier.log_reg_classifier_utils import (
-    build_training_data, get_regularization_factor, text_to_utterance)
-from snips_nlu.pipeline.configs import LogRegIntentClassifierConfig
+    build_training_data, text_to_utterance)
+from snips_nlu.pipeline.configs import SVMIntentClassifierConfig
 from snips_nlu.result import intent_classification_result
 
 logger = logging.getLogger(__name__)
 
 # We set tol to 1e-3 to silence the following warning with Python 2 (
 # scikit-learn 0.20):
-#
-# FutureWarning: max_iter and tol parameters have been added in SGDClassifier
-# in 0.19. If max_iter is set but tol is left unset, the default value for tol
-# in 0.19 and 0.20 will be None (which is equivalent to -infinity, so it has no
-# effect) but will change in 0.21 to 1e-3. Specify tol to silence this warning.
 
-LOG_REG_ARGS = {
-    "loss": "log",
+SVM_ARGS = {
+    "loss": "hinge", # hinge
     "penalty": "l2",
-    "max_iter": 1000,
+    "max_iter": 2000,
+    "random_state": 42,
     "tol": 1e-3,
-    "n_jobs": -1
+    "intercept_scaling": 1,
+    "verbose": 1,
+    "fit_intercept": True,
+    "multi_class": "ovr", # crammer_singer,
+    "C": 0.1, # most important 0.1
+    "dual": True,
+    "kernel": 'rbf',
+    "gamma": 1.0, # 1.0
+    "epsilon": 0.1
 }
 
 
-@IntentClassifier.register("log_reg_intent_classifier")
-class LogRegIntentClassifier(IntentClassifier):
+@IntentClassifier.register("svm_intent_classifier")
+class SVMIntentClassifier(IntentClassifier):
     """Intent classifier which uses a Logistic Regression underneath"""
 
-    config_type = LogRegIntentClassifierConfig
+    config_type = SVMIntentClassifierConfig
 
     def __init__(self, config=None, **shared):
-        """The LogReg intent classifier can be configured by passing a
-        :class:`.LogRegIntentClassifierConfig`"""
-        super(LogRegIntentClassifier, self).__init__(config, **shared)
+        """The SVM intent classifier can be configured by passing a
+        :class:`.SVMIntentClassifierConfig`"""
+        super(SVMIntentClassifier, self).__init__(config, **shared)
         self.classifier = None
         self.intent_list = None
         self.featurizer = None
@@ -57,19 +61,18 @@ class LogRegIntentClassifier(IntentClassifier):
         return self.intent_list is not None
 
     @log_elapsed_time(logger, logging.INFO,
-                      "LogRegIntentClassifier in {elapsed_time}")
+                      "SVMIntentClassifier in {elapsed_time}")
     def fit(self, dataset):
         """Fits the intent classifier with a valid Snips dataset
 
         Returns:
-            :class:`LogRegIntentClassifier`: The same instance, trained
+            :class:`SVMIntentClassifier`: The same instance, trained
         """
-        from sklearn.linear_model import SGDClassifier
+        from sklearn import svm
+        from sklearn.ensemble import BaggingClassifier
         from sklearn.utils import compute_class_weight
-        from sklearn.preprocessing import StandardScaler
-        from sklearn.pipeline import make_pipeline
 
-        logger.info("Fitting LogRegIntentClassifier...")
+        logger.info("Fitting SVMIntentClassifier...")
         dataset = validate_and_format_dataset(dataset)
         self.load_resources_if_needed(dataset[LANGUAGE])
         self.fit_builtin_entity_parser_if_needed(dataset)
@@ -103,17 +106,23 @@ class LogRegIntentClassifier(IntentClassifier):
             self.featurizer = None
             return self
 
-        alpha = get_regularization_factor(dataset)
+        #alpha = get_regularization_factor(dataset)
 
-        class_weights_arr = compute_class_weight(
-            "balanced", range(none_class + 1), classes)
+        #class_weights_arr = compute_class_weight(
+        #    "balanced", range(none_class + 1), classes)
         # Re-weight the noise class
-        class_weights_arr[-1] *= self.config.noise_reweight_factor
-        class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
+        #class_weights_arr[-1] *= self.config.noise_reweight_factor
+        #class_weight = {idx: w for idx, w in enumerate(class_weights_arr)}
 
-        self.classifier = SGDClassifier(
-            random_state=self.random_state, alpha=alpha,
-            class_weight=class_weight, **LOG_REG_ARGS)
+        print('--------------- svm.LinearSVC')
+        svm_args = self.config.get('classifier_config') if self.config.get('classifier_config') else SVM_ARGS
+        self.classifier = BaggingClassifier(estimator=svm.SVC(
+                random_state=self.random_state,
+                #class_weight=class_weight, 
+                **svm_args
+            ),
+            n_estimators=10, random_state=self.random_state
+        )
         self.classifier.fit(x, classes)
         logger.debug("%s", DifferedLoggingMessage(self.log_best_features))
         return self
@@ -208,17 +217,14 @@ class LogRegIntentClassifier(IntentClassifier):
 
         coeffs = None
         intercept = None
-        t_ = None
         if self.classifier is not None:
             coeffs = self.classifier.coef_.tolist()
             intercept = self.classifier.intercept_.tolist()
-            t_ = self.classifier.t_
 
         self_as_dict = {
             "config": self.config.to_dict(),
             "coeffs": coeffs,
             "intercept": intercept,
-            "t_": t_,
             "intent_list": self.intent_list,
             "featurizer": featurizer
         }
@@ -231,13 +237,13 @@ class LogRegIntentClassifier(IntentClassifier):
 
     @classmethod
     def from_path(cls, path, **shared):
-        """Loads a :class:`LogRegIntentClassifier` instance from a path
+        """Loads a :class:`SVMIntentClassifier` instance from a path
 
         The data at the given path must have been generated using
-        :func:`~LogRegIntentClassifier.persist`
+        :func:`~SVMIntentClassifier.persist`
         """
         import numpy as np
-        from sklearn.linear_model import SGDClassifier
+        from sklearn import svm
 
         path = Path(path)
         model_path = path / "intent_classifier.json"
@@ -249,20 +255,18 @@ class LogRegIntentClassifier(IntentClassifier):
             model_dict = json.load(f)
 
         # Create the classifier
-        config = LogRegIntentClassifierConfig.from_dict(model_dict["config"])
+        config = SVMIntentClassifierConfig.from_dict(model_dict["config"])
         intent_classifier = cls(config=config, **shared)
         intent_classifier.intent_list = model_dict['intent_list']
 
-        # Create the underlying SGD classifier
+        # Create the underlying LinearSVM classifier
         sgd_classifier = None
         coeffs = model_dict['coeffs']
         intercept = model_dict['intercept']
-        t_ = model_dict["t_"]
         if coeffs is not None and intercept is not None:
-            sgd_classifier = SGDClassifier(**LOG_REG_ARGS)
+            sgd_classifier = svm.LinearSVC(**SVM_ARGS)
             sgd_classifier.coef_ = np.array(coeffs)
             sgd_classifier.intercept_ = np.array(intercept)
-            sgd_classifier.t_ = t_
         intent_classifier.classifier = sgd_classifier
 
         # Add the featurizer

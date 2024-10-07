@@ -121,7 +121,8 @@ class ProcessingUnit(with_metaclass(ABCMeta, Registrable)):
                 "ProcessingUnitConfig or dict or str but found: %s"
                 % type(unit_config))
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def fitted(self):
         """Whether or not the processing unit has already been trained"""
         pass

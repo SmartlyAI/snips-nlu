@@ -2,7 +2,8 @@ from .config import Config, ProcessingUnitConfig
 from .features import default_features_factories
 from .intent_classifier import (CooccurrenceVectorizerConfig, FeaturizerConfig,
                                 IntentClassifierDataAugmentationConfig,
-                                LogRegIntentClassifierConfig)
+                                LogRegIntentClassifierConfig,
+                                SVMIntentClassifierConfig)
 from .intent_parser import (DeterministicIntentParserConfig,
                             LookupIntentParserConfig,
                             ProbabilisticIntentParserConfig)

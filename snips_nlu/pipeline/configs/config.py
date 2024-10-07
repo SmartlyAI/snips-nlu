@@ -1,6 +1,6 @@
 from __future__ import unicode_literals
 
-from abc import ABCMeta, abstractmethod, abstractproperty
+from abc import ABCMeta, abstractmethod
 from builtins import object
 
 from future.utils import with_metaclass
@@ -20,7 +20,8 @@ class ProcessingUnitConfig(with_metaclass(ABCMeta, Config)):
     """Represents the configuration object needed to initialize a
         :class:`.ProcessingUnit`"""
 
-    @abstractproperty
+    @property
+    @abstractmethod
     def unit_name(self):
         raise NotImplementedError
 
